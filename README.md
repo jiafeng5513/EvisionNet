@@ -1,4 +1,4 @@
-立体匹配算法
+Disparity-Enhance Generative Adversarial Network
 =====
 ### 1. 目录说明<br>
 * doc:文档和参考文献
