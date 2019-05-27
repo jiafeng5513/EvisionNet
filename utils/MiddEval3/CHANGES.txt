@@ -1,0 +1,67 @@
+06/10/2014: MiddEval3-SDK-1.0
+initial version
+
+07/03/2014: MiddEval3-SDK-1.1
+added support for evaluating with full-size GT
+added support for zipping training results only
+updated documentation
+changed: runeval, code/evaldisp.cpp, makezip, README.txt
+added:   runevalF
+
+07/11/2014: MiddEval3-SDK-1.2
+fixed makezip so it works if no disp0..._s.pfm files are present
+(this was already added to SDK-1.1 on 07/08)
+added change log
+changed: makezip, README.txt
+added:   CHANGES.txt (this file)
+
+07/15/2014: MiddEval3-SDK-1.3
+added -b option to runeval and runevalF
+updated code/evaldisp.cpp to omit '%' and TAB symbols in output
+changed: runeval, runevalF, code/evaldisp.cpp, README.txt
+
+08/27/2014: MiddEval3-SDK-1.4
+added checking of time*.txt files to makezip
+updated README file to mention downloading of results from online
+table and clarify online submission process
+changed: makezip, README.txt
+
+01/27/2015: MiddEval3-SDK-1.5
+updated libelas to latest version
+removed: alg-ELAS/src/orig/elas-orig.cpp
+changed:
+ alg-ELAS/src/elas.cpp
+ alg-ELAS/src/triangle.cpp
+ alg-ELAS/matlab/make.m
+ alg-ELAS/README-Middlebury.txt
+changed computation of average error and added clipping of disparities
+changed:
+ code/evaldisp.cpp, code/Makefile
+ runeval, runevalF, makezip, README.txt
+
+09/14/2015: MiddEval3-SDK-1.6
+Changed sample run script alg-ELAS/run to use code/png2pgm to convert
+from color to gray images instead of using ImageMagick's "convert"
+tool, which had differing behavior depending on version and OS.
+Added tool code/disp2pfm.cpp to provide an alternate method of
+converting integer disparities to pfm format.
+Updated code/imageLib to latest version.
+Modified makezip to print cause of error if number format is wrong
+(could be caused by missing program 'bc').
+removed:
+ code/imageLib/codeIO.cpp
+ code/imageLib/codeIO.h
+added:
+ code/imageLib/README.txt
+ code/png2pgm.cpp
+ code/disp2pfm.cpp
+changed:
+ alg-ELAS/run
+ code/imageLib/Convert.cpp
+ code/imageLib/Error.h
+ code/imageLib/ImageIO.cpp
+ code/imageLib/Makefile
+ code/Makefile
+ code/README.txt
+ makezip
+ README.txt
