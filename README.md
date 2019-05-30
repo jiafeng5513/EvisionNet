@@ -1,4 +1,4 @@
-Using Deep learning Technique for Stereo vision and 3D reconstruction
+EvisonNet
 =====
 ### 1. 目录说明<br>
 * doc:文档和参考文献
