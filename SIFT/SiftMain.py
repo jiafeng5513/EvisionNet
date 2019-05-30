@@ -38,7 +38,7 @@ def drawMatchesKnn_cv2(img1_gray, kp1, img2_gray, kp2, goodMatch):
 
 if __name__ == '__main__':
     img1_gray = cv2.imread("../examples/std/lena.jpg")
-    img2_gray = cv2.imread("../examples/std/lena.jpg")
+    img2_gray = cv2.imread("../examples/std/lena-2.jpg")
 
     sift = cv2.xfeatures2d.SIFT_create()
     # sift = cv2.SURF()

@@ -1,0 +1,29 @@
+Learning to Assign Orientations to Feature Points
+
+We show how to train a Convolutional Neural Networkto assign a canonical orientation to feature points given animage patch centered on the feature point. Our method im-proves feature point matching upon the state-of-the art andcan be used in conjunction with any existing rotation sensi-tive descriptors.  To avoid the tedious and almost impossi-ble task of finding a target orientation to learn, we proposeto use Siamese networks which implicitly find the optimalorientations during training.  We also propose a new typeof activation function for Neural Networks that generalizesthe  popular  ReLU,  maxout,  and  PReLU  activation  func-tions.   This novel activation performs better for our task.We validate the effectiveness of our method extensively withfour existing datasets,  including two non-planar datasets,as well as our own dataset.  We show that we outperformthe state-of-the-art without the need of retraining for eachdataset.
+
+我们展示了如何训练卷积神经网络，在给定以特征点为中心的图像块的情况下为特征点指定规范方向。 我们的方法改进了现有技术的特征点匹配，并且可以与任何现有的旋转敏感描述符结合使用。 为了避免繁琐且几乎不可能完成寻找目标定位的任务，我们建议使用Siamese网络，在训练过程中隐含地找到最佳方向。我们还为神经网络提出了一种新型的激活函数，它推广了流行的ReLU，maxout和PReLU激活函数。 这种新颖的激活对我们的任务更有效。 我们使用四个现有数据集（包括两个非平面数据集）以及我们自己的数据集来广泛验证我们的方法的有效性。 我们在不需要对每个数据集进行再培训的情况下，优于最先进的技术。
+
+1. Introduction
+
+特征点是计算机视觉中必不可少且普遍存在的工具，并且已经对探测器[3,6,22,25,27,32,48]和描述符[2,6,22,25,32,38,43,47]进行了广泛的研究。包括使用统计学方法[33,46]。 然而，作为一个重要的共同步骤,方向的分配几乎没有受到关注，可能因为SIFT [25]的主导方向被认为是给出了良好的结果。
+
+但是，这不一定是真的。 在复杂场景中，特征点位于非平面表面上，并且它们的外观可以通过视点和照明变化而大幅改变。 如图1所示，这很容易产生方向估计误差。此外，旋转不变描述符[7,14,42]也不是确定的解决方案，因为这些描述符丢弃了在给出理想方向时有用的旋转敏感信息。 因此，正如我们将在实验中展示的那样，使用旋转敏感描述符和更好的方向分配可以实现更高的匹配性能。
+
+在本文中，我们将展示如何通过训练回归量来估计更好的匹配方向以及提高现有旋转敏感描述符的性能来解决这个问题。 在给定特征点周围的patch的情况下，我们训练卷积神经网络来预测方向。 为了避免发现规范学习方向的困难任务，我们通过训练一个类似于描述符学习方法的 Siamese网络[9,12]来将学习方向作为一个隐含变量来学习[33,46]。 此外，为了让我们的方法与任何现有的旋转敏感描述符（如SIFT [25]，SURF [6]和基于学习的VGG [34]）一起工作，我们在学习时将描述符组件视为黑盒子。
+
+我们还提出了一种基于Generalized Hinging Hyperplanes (GHH)[41]的激活函数，它在我们的方法中起着关键作用。 我们将展示它推广流行的ReLU和maxout [16]激活函数，以及最近的PReLU [17]激活函数，为我们的任务提供更好的性能.为了评估性能，我们使用具有平面或远处对象[26,40,48]和3D对象[1,36]的数据集。 此外，我们还创建了自己的数据集，以进一步丰富具有复杂相机移动的数据集，例如平面内旋转和视点变化。 我们证明了所提出的方法对所有数据集的最新技术都有了显着的改进，而无需对每个数据集进行重新训练。
+
+在本文的其余部分，我们首先讨论相关工作，介绍我们的学习框架，详细介绍我们的方法以及提出的激活函数。然后，我们展示我们的实验结果，证明我们的定向分配的有效性与最先进的技术相比。我们还研究了所提出的激活和数据集的影响，并且我们总结了几个应用结果。
+
+2.RelatedWork
+
+如[15]的调查所示，方向估计的重要性被忽略了，并且被认为是特征点检测器或描述符必须执行的不重要的步骤。 用于为特征点指定方向的广泛使用的解决方案是改进的方向性[25]。 然而，正如[24]所指出的那样，虽然对描述符性能有重要影响，但是基于显性方向的方法并不适用于任意位置[23]。 然而，在这里，我们简要回顾了与方向分配和方法相关的现有方法。
+
+特征点检测器的方向分配。 在SIFT [25]中，梯度方向的直方图用于确定主导方向。 它仍然是最流行的方法，并已扩展到3D [4]。 SURF [6]使用样本点的Haar小波响应来提取主方向。 MOPs [11]在一些平滑之后简单地使用patch中心的梯度来提高噪声的稳健性。 ORB [32]使用图像矩来计算质心和主方向。 HIP [37]考虑了以特征点为中心的圆上的强度差异来估计方向。速度相当快，对噪音也非常敏感。
+
+总之，尽管存在差异，但这些方法的主要思想仍然是相同的：在各自的方式中找到可靠的主方向。 因此，当计算时间的要求不高时，使用SIFT方向仍然是尝试的第一个解决方案[15]。
+
+旋转不变描述符。 由于现有的方向分配方法并不总是足够稳健以保证良好的匹配性能，因此已经引起了对固有旋转不变的描述符的兴趣[14,42]。 MROGH [14]使用具有旋转不变梯度的局部强度顺序汇集，LIOP [42]以类似的方式构造描述符，但具有用于聚合梯度信息的不同策略。 BRISK [22]和FREAK [2]也声称了旋转不变性，但它们仍然依赖于包含在描述符提取过程中的方向估计。
+
+除了通过构造旋转不变的描述符之外，[21]使用同心环来生成具有自旋图像的方向直方图箱，并且使用用于旋转不变匹配的特定距离函数。 sGLOH [7]还建议使用旋转不变距离函数，该函数计算所有可能的旋转组合的距离并取最小值。 作者进一步扩展了他们的方法，提出了一种基于直方图的特征描述符的通用方法，同时考虑了场景的主要方向[8]。

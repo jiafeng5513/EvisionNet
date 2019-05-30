@@ -1,0 +1,30 @@
+2012
+Download stereo/optical flow data set (2 GB)
+https://s3.eu-central-1.amazonaws.com/avg-kitti/data_stereo_flow.zip
+
+Download stereo/optical flow calibration files (1 MB)
+https://s3.eu-central-1.amazonaws.com/avg-kitti/data_stereo_flow_calib.zip
+
+Download multi-view extension (20 frames per scene, all cameras) (17 GB)
+https://s3.eu-central-1.amazonaws.com/avg-kitti/data_stereo_flow_multiview.zip
+
+Semantic and instance labels for 60 images and car labels for all training images (1 MB)
+http://www.cvlibs.net/projects/displets/
+
+Download stereo/optical flow development kit (3 MB)
+https://s3.eu-central-1.amazonaws.com/avg-kitti/devkit_stereo_flow.zip
+
+2015
+
+Download stereo 2015/flow 2015/scene flow 2015 data set (2 GB)
+https://s3.eu-central-1.amazonaws.com/avg-kitti/data_scene_flow.zip
+
+Download calibration files (1 MB)
+https://s3.eu-central-1.amazonaws.com/avg-kitti/data_scene_flow_calib.zip
+
+Download multi-view extension (20 frames per scene) (14 GB)
+https://s3.eu-central-1.amazonaws.com/avg-kitti/data_scene_flow_multiview.zip
+
+Download development kit (3 MB)
+https://s3.eu-central-1.amazonaws.com/avg-kitti/devkit_scene_flow.zip
+
