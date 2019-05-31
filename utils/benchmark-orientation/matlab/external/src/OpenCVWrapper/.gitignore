@@ -1,0 +1,4 @@
+opencvDescriptor
+opencvDetector
+*.o
+build

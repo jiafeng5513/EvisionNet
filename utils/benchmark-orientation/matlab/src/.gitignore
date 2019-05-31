@@ -1,0 +1,6 @@
+*.mat
+*.m~
+.lock/*
+results_BIG
+results_mat_bak
+

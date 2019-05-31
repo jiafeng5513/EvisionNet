@@ -1,0 +1,6 @@
+data
+matlab/src/*.mex*
+matlab/*.mat
+*.o
+*.DS_Store
+*.m~
