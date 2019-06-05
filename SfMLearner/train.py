@@ -23,6 +23,9 @@ flags.DEFINE_integer("summary_freq", 100, "Logging every log_freq iterations")
 flags.DEFINE_integer("save_latest_freq", 5000, \
     "Save the latest model every save_latest_freq iterations (overwrites the previous latest model)")
 flags.DEFINE_boolean("continue_train", False, "Continue training from previous checkpoint")
+# add by jiafeng5513,followed by https://github.com/tinghuiz/SfMLearner/pull/70
+flags.DEFINE_integer("num_source", None, "number of source images")
+flags.DEFINE_integer("num_scales", None, "number of used image scales")
 FLAGS = flags.FLAGS
 
 def main(_):

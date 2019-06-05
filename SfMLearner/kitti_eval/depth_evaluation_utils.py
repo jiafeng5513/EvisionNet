@@ -137,7 +137,9 @@ def read_calib_file(path):
             if float_chars.issuperset(value):
                 # try to cast to float array
                 try:
-                    data[key] = np.array(map(float, value.split(' ')))
+                    #data[key] = np.array(map(float, value.split(' ')))
+                    #fix by jiafeng5513 follow by https://github.com/tinghuiz/SfMLearner/issues/55
+                    data[key] = np.array([float(v) for v in value.split(' ')])
                 except ValueError:
                     # casting error: data[key] already eq. value, so pass
                     pass
@@ -207,7 +209,9 @@ def generate_depth_map(calib_dir, velo_file_name, im_shape, cam=2, interp=False,
 
     # find the duplicate points and choose the closest depth
     inds = sub2ind(depth.shape, velo_pts_im[:, 1], velo_pts_im[:, 0])
-    dupe_inds = [item for item, count in Counter(inds).iteritems() if count > 1]
+    # fix by jiafeng5513,follow by https://github.com/tinghuiz/SfMLearner/issues/55
+    #dupe_inds = [item for item, count in Counter(inds).iteritems() if count > 1]
+    dupe_inds = [item for item, count in Counter(inds).items() if count > 1]
     for dd in dupe_inds:
         pts = np.where(inds==dd)[0]
         x_loc = int(velo_pts_im[pts[0], 0])
