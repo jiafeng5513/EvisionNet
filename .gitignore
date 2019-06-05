@@ -831,3 +831,5 @@ local.properties
 将删除 SfMLearner/kitti_eval/kitti_eigen_depth_predictions.npy
 将删除 utils/benchmark-orientation/matlab/external/src/freak-master/originalFreakDescriptor
 *.npy
+/SfMLearner/kitti_eval/pose_data/
+将删除 SfMLearner/kitti_eval/pose_data/
