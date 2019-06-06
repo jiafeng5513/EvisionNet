@@ -44,7 +44,7 @@ def main(_):
                 idx = t + b
                 if idx >= len(test_files):
                     break
-                fh = open(test_files[idx], 'r')
+                fh = open(test_files[idx], 'rb')  # to fix the UnicodeDecodeError about utf8,change 'r' to 'rb',by jiafeng5513
                 raw_im = pil.open(fh)
                 scaled_im = raw_im.resize((FLAGS.img_width, FLAGS.img_height), pil.ANTIALIAS)
                 inputs[b] = np.array(scaled_im)

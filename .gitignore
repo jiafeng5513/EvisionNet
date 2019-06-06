@@ -833,3 +833,9 @@ local.properties
 *.npy
 /SfMLearner/kitti_eval/pose_data/
 将删除 SfMLearner/kitti_eval/pose_data/
+/SfMLearner/test_output/
+将删除 SfMLearner/models/kitti_depth_model/model-190532.data-00000-of-00001
+将删除 SfMLearner/models/kitti_depth_model/model-190532.index
+将删除 SfMLearner/models/kitti_pose_model/model-100280.data-00000-of-00001
+将删除 SfMLearner/models/kitti_pose_model/model-100280.index
+将删除 SfMLearner/test_output/test_pose/

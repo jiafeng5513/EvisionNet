@@ -5,5 +5,5 @@
         --dump_root=/home/RAID1/DataSet/KITTI/KittiOdometry_prepared/ \
         --seq_length=3 \
         --img_width=416 \
-        --img_height=171 \
+        --img_height=128 \
         --num_threads=4
