@@ -17,6 +17,8 @@ EvisonNet
 [4]. Han, Xufeng, et al. "Matchnet: Unifying feature and metric learning for patch-based matching." Proceedings of the IEEE Conference on Computer Vision and Pattern Recognition. 2015.[matchnet](https://github.com/hanxf/matchnet).<br>
 [5]. Zhou, Tinghui, et al. "Unsupervised learning of depth and ego-motion from video." Proceedings of the IEEE Conference on Computer Vision and Pattern Recognition. 2017.[SfMLearner](https://github.com/tinghuiz/SfMLearner).<br>
 [6]. Yi, Kwang Moo, et al. "Lift: Learned invariant feature transform." European Conference on Computer Vision. Springer, Cham, 2016.
+[7]. Teng, Qianru, Yimin Chen, and Chen Huang. "Occlusion-Aware Unsupervised Learning of Monocular Depth, Optical Flow and Camera Pose with Geometric Constraints." Future Internet 10.10 (2018): 92.
+[8]. Liu, Qiang, et al. "Using Unsupervised Deep Learning Technique for Monocular Visual Odometry." IEEE Access 7 (2019): 18076-18088.
 ### 4. 参考项目
 [1]. [EdgeConnect](https://github.com/knazeri/edge-connect)<br>
 [2]. [Cycled-GAN](https://github.com/andrea-pilzer/unsup-stereo-depthGAN/)<br>
@@ -28,6 +30,8 @@ EvisonNet
 [4]. [PSMNet解析](https://blog.csdn.net/zhiwei2coder/article/details/79929864?utm_source=blogxgwz3)<br>
 [5]. [中科院自动化所三维重建数据集](http://vision.ia.ac.cn/zh/data/index.html)<br>
 [6]. [SfMLearner(Depth and Ego-Motion)解析](https://zhuanlan.zhihu.com/p/50544334)<br>
+[7]. [OpenMVS](https://github.com/cdcseacave/openMVS)<br>
+[8]. [OpenMVG](https://github.com/openMVG/openMVG)<br>
 ### 6.基本思路
 1. 构造两个网络,一个是相机位姿估计网络,称为p-net,一个是特征点匹配网络,称为m-net.<br>
 2. 两个网络共享一些层.<br>
