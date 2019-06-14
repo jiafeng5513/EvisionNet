@@ -32,18 +32,5 @@ EvisonNet
 [6]. [SfMLearner(Depth and Ego-Motion)解析](https://zhuanlan.zhihu.com/p/50544334)<br>
 [7]. [OpenMVS](https://github.com/cdcseacave/openMVS)<br>
 [8]. [OpenMVG](https://github.com/openMVG/openMVG)<br>
-### 6.基本思路
-1. 构造两个网络,一个是相机位姿估计网络,称为p-net,一个是特征点匹配网络,称为m-net.<br>
-2. 两个网络共享一些层.<br>
-3. p-net使用三联帧估计出相机的运动.<br>
-4. m-net获取匹配点.<br>
-5. 进行三维重建.<br>
-6. 全部基于单目多视角图片序列.<br>
-7. 参考文献2,3,4中的对于特征匹配的实验可以参考.<br>
-8. SfMLearner的位置准确度实验可以参考.<br>
-9. 参考文献2中的三维重建实验可以参考.<br>
-
-### 7.重点难点
-1. m-net的构造,以及其输出结果和SIFT的结果如何进行对比,能否对应和替换.<br>
-2. SFM 和 MVS中,如何应用SIFT匹配结果.<br>
-3. SFM 和 MVS中,如何应用相机姿态,需要什么样的数据,如何和原有方法进行替换.<br>
+[9]. [CVonline,图片数据集汇总](http://homepages.inf.ed.ac.uk/rbf/CVonline/Imagedbase.htm)<br>
+[10]. [VisualData数据集搜索](https://www.visualdata.io/)<br>
