@@ -19,6 +19,7 @@ EvisonNet
 [6]. Yi, Kwang Moo, et al. "Lift: Learned invariant feature transform." European Conference on Computer Vision. Springer, Cham, 2016.
 [7]. Teng, Qianru, Yimin Chen, and Chen Huang. "Occlusion-Aware Unsupervised Learning of Monocular Depth, Optical Flow and Camera Pose with Geometric Constraints." Future Internet 10.10 (2018): 92.
 [8]. Liu, Qiang, et al. "Using Unsupervised Deep Learning Technique for Monocular Visual Odometry." IEEE Access 7 (2019): 18076-18088.
+[9]. DeepCalib: a deep learning approach for automatic intrinsic calibration of wide field-of-view cameras.[关键词:Camera Calibrate deep learning]
 ### 4. 参考项目
 [1]. [EdgeConnect](https://github.com/knazeri/edge-connect)<br>
 [2]. [Cycled-GAN](https://github.com/andrea-pilzer/unsup-stereo-depthGAN/)<br>
