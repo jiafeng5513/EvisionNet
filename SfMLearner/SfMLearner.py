@@ -1,4 +1,4 @@
-
+# -*- coding: utf-8 -*-
 from __future__ import division
 import os
 import time
@@ -6,9 +6,214 @@ import math
 import numpy as np
 import tensorflow as tf
 import tensorflow.contrib.slim as slim
+import pprint
+import random
+from tensorflow.contrib.layers.python.layers import utils
+import PIL.Image as pil
+import scipy.misc
+from glob import glob
+from kitti_eval.pose_evaluation_utils import dump_pose_seq_TUM
 from data_loader import DataLoader
-from nets import *
 from utils import *
+
+# Range of disparity/inverse depth values
+DISP_SCALING = 10
+MIN_DISP = 0.01
+
+flags = tf.app.flags
+flags.DEFINE_integer("run_mode", 0, "0=train,1=test_depth,2=test_pose")
+flags.DEFINE_string("dataset_dir", "", "Dataset directory")
+flags.DEFINE_string("checkpoint_dir", "./checkpoints/", "Directory name to save the checkpoints")
+flags.DEFINE_string("init_checkpoint_file", None, "Specific checkpoint file to initialize from")
+flags.DEFINE_float("learning_rate", 0.0002, "Learning rate of for adam")
+flags.DEFINE_float("beta1", 0.9, "Momentum term of adam")
+flags.DEFINE_float("smooth_weight", 0.5, "Weight for smoothness")
+flags.DEFINE_float("explain_reg_weight", 0.0, "Weight for explanability regularization")
+flags.DEFINE_integer("batch_size", 4, "The size of of a sample batch")
+flags.DEFINE_integer("img_height", 128, "Image height")
+flags.DEFINE_integer("img_width", 416, "Image width")
+flags.DEFINE_integer("seq_length", 3, "Sequence length for each example")
+flags.DEFINE_integer("max_steps", 200000, "Maximum number of training iterations")
+flags.DEFINE_integer("summary_freq", 100, "Logging every log_freq iterations")
+flags.DEFINE_integer("save_latest_freq", 5000, \
+                     "Save the latest model every save_latest_freq iterations (overwrites the previous latest model)")
+flags.DEFINE_boolean("continue_train", False, "Continue training from previous checkpoint")
+# add by jiafeng5513,followed by https://github.com/tinghuiz/SfMLearner/pull/70
+flags.DEFINE_integer("num_source", None, "number of source images")
+flags.DEFINE_integer("num_scales", None, "number of used image scales")
+flags.DEFINE_string("output_dir", None, "Output directory")
+flags.DEFINE_string("ckpt_file", None, "checkpoint file")
+flags.DEFINE_integer("test_seq", 9, "Sequence id to test")
+FLAGS = flags.FLAGS
+
+def resize_like(inputs, ref):
+    iH, iW = inputs.get_shape()[1], inputs.get_shape()[2]
+    rH, rW = ref.get_shape()[1], ref.get_shape()[2]
+    if iH == rH and iW == rW:
+        return inputs
+    return tf.image.resize_nearest_neighbor(inputs, [rH.value, rW.value])
+
+
+def pose_exp_net(tgt_image, src_image_stack, do_exp=True, is_training=True):
+    inputs = tf.concat([tgt_image, src_image_stack], axis=3)
+    H = inputs.get_shape()[1].value
+    W = inputs.get_shape()[2].value
+    num_source = int(src_image_stack.get_shape()[3].value // 3)
+    with tf.variable_scope('pose_exp_net') as sc:
+        end_points_collection = sc.original_name_scope + '_end_points'
+        with slim.arg_scope([slim.conv2d, slim.conv2d_transpose],
+                            normalizer_fn=None,
+                            weights_regularizer=slim.l2_regularizer(0.05),
+                            activation_fn=tf.nn.relu,
+                            outputs_collections=end_points_collection):
+            # cnv1 to cnv5b are shared between pose and explainability prediction
+            cnv1 = slim.conv2d(inputs, 16, [7, 7], stride=2, scope='cnv1')
+            cnv2 = slim.conv2d(cnv1, 32, [5, 5], stride=2, scope='cnv2')
+            cnv3 = slim.conv2d(cnv2, 64, [3, 3], stride=2, scope='cnv3')
+            cnv4 = slim.conv2d(cnv3, 128, [3, 3], stride=2, scope='cnv4')
+            cnv5 = slim.conv2d(cnv4, 256, [3, 3], stride=2, scope='cnv5')
+            # Pose specific layers
+            with tf.variable_scope('pose'):
+                cnv6 = slim.conv2d(cnv5, 256, [3, 3], stride=2, scope='cnv6')
+                cnv7 = slim.conv2d(cnv6, 256, [3, 3], stride=2, scope='cnv7')
+                pose_pred = slim.conv2d(cnv7, 6 * num_source, [1, 1], scope='pred',
+                                        stride=1, normalizer_fn=None, activation_fn=None)
+                pose_avg = tf.reduce_mean(pose_pred, [1, 2])
+                # Empirically we found that scaling by a small constant
+                # facilitates training.
+                pose_final = 0.01 * tf.reshape(pose_avg, [-1, num_source, 6])
+            # Exp mask specific layers
+            if do_exp:
+                with tf.variable_scope('exp'):
+                    upcnv5 = slim.conv2d_transpose(cnv5, 256, [3, 3], stride=2, scope='upcnv5')
+
+                    upcnv4 = slim.conv2d_transpose(upcnv5, 128, [3, 3], stride=2, scope='upcnv4')
+                    mask4 = slim.conv2d(upcnv4, num_source * 2, [3, 3], stride=1, scope='mask4',
+                                        normalizer_fn=None, activation_fn=None)
+
+                    upcnv3 = slim.conv2d_transpose(upcnv4, 64, [3, 3], stride=2, scope='upcnv3')
+                    mask3 = slim.conv2d(upcnv3, num_source * 2, [3, 3], stride=1, scope='mask3',
+                                        normalizer_fn=None, activation_fn=None)
+
+                    upcnv2 = slim.conv2d_transpose(upcnv3, 32, [5, 5], stride=2, scope='upcnv2')
+                    mask2 = slim.conv2d(upcnv2, num_source * 2, [5, 5], stride=1, scope='mask2',
+                                        normalizer_fn=None, activation_fn=None)
+
+                    upcnv1 = slim.conv2d_transpose(upcnv2, 16, [7, 7], stride=2, scope='upcnv1')
+                    mask1 = slim.conv2d(upcnv1, num_source * 2, [7, 7], stride=1, scope='mask1',
+                                        normalizer_fn=None, activation_fn=None)
+            else:
+                mask1 = None
+                mask2 = None
+                mask3 = None
+                mask4 = None
+            end_points = utils.convert_collection_to_dict(end_points_collection)
+            return pose_final, [mask1, mask2, mask3, mask4], end_points
+
+
+def disp_net(tgt_image, is_training=True):
+    H = tgt_image.get_shape()[1].value
+    W = tgt_image.get_shape()[2].value
+    with tf.variable_scope('depth_net') as sc:
+        end_points_collection = sc.original_name_scope + '_end_points'
+        with slim.arg_scope([slim.conv2d, slim.conv2d_transpose],
+                            normalizer_fn=None,
+                            weights_regularizer=slim.l2_regularizer(0.05),
+                            activation_fn=tf.nn.relu,
+                            outputs_collections=end_points_collection):
+            cnv1 = slim.conv2d(tgt_image, 32, [7, 7], stride=2, scope='cnv1')
+            cnv1b = slim.conv2d(cnv1, 32, [7, 7], stride=1, scope='cnv1b')
+            cnv2 = slim.conv2d(cnv1b, 64, [5, 5], stride=2, scope='cnv2')
+            cnv2b = slim.conv2d(cnv2, 64, [5, 5], stride=1, scope='cnv2b')
+            cnv3 = slim.conv2d(cnv2b, 128, [3, 3], stride=2, scope='cnv3')
+            cnv3b = slim.conv2d(cnv3, 128, [3, 3], stride=1, scope='cnv3b')
+            cnv4 = slim.conv2d(cnv3b, 256, [3, 3], stride=2, scope='cnv4')
+            cnv4b = slim.conv2d(cnv4, 256, [3, 3], stride=1, scope='cnv4b')
+            cnv5 = slim.conv2d(cnv4b, 512, [3, 3], stride=2, scope='cnv5')
+            cnv5b = slim.conv2d(cnv5, 512, [3, 3], stride=1, scope='cnv5b')
+            cnv6 = slim.conv2d(cnv5b, 512, [3, 3], stride=2, scope='cnv6')
+            cnv6b = slim.conv2d(cnv6, 512, [3, 3], stride=1, scope='cnv6b')
+            cnv7 = slim.conv2d(cnv6b, 512, [3, 3], stride=2, scope='cnv7')
+            cnv7b = slim.conv2d(cnv7, 512, [3, 3], stride=1, scope='cnv7b')
+
+            upcnv7 = slim.conv2d_transpose(cnv7b, 512, [3, 3], stride=2, scope='upcnv7')
+            # There might be dimension mismatch due to uneven down/up-sampling
+            upcnv7 = resize_like(upcnv7, cnv6b)
+            i7_in = tf.concat([upcnv7, cnv6b], axis=3)
+            icnv7 = slim.conv2d(i7_in, 512, [3, 3], stride=1, scope='icnv7')
+
+            upcnv6 = slim.conv2d_transpose(icnv7, 512, [3, 3], stride=2, scope='upcnv6')
+            upcnv6 = resize_like(upcnv6, cnv5b)
+            i6_in = tf.concat([upcnv6, cnv5b], axis=3)
+            icnv6 = slim.conv2d(i6_in, 512, [3, 3], stride=1, scope='icnv6')
+
+            upcnv5 = slim.conv2d_transpose(icnv6, 256, [3, 3], stride=2, scope='upcnv5')
+            upcnv5 = resize_like(upcnv5, cnv4b)
+            i5_in = tf.concat([upcnv5, cnv4b], axis=3)
+            icnv5 = slim.conv2d(i5_in, 256, [3, 3], stride=1, scope='icnv5')
+
+            upcnv4 = slim.conv2d_transpose(icnv5, 128, [3, 3], stride=2, scope='upcnv4')
+            i4_in = tf.concat([upcnv4, cnv3b], axis=3)
+            icnv4 = slim.conv2d(i4_in, 128, [3, 3], stride=1, scope='icnv4')
+            disp4 = DISP_SCALING * slim.conv2d(icnv4, 1, [3, 3], stride=1,
+                                               activation_fn=tf.sigmoid, normalizer_fn=None, scope='disp4') + MIN_DISP
+            disp4_up = tf.image.resize_bilinear(disp4, [np.int(H / 4), np.int(W / 4)])
+
+            upcnv3 = slim.conv2d_transpose(icnv4, 64, [3, 3], stride=2, scope='upcnv3')
+            i3_in = tf.concat([upcnv3, cnv2b, disp4_up], axis=3)
+            icnv3 = slim.conv2d(i3_in, 64, [3, 3], stride=1, scope='icnv3')
+            disp3 = DISP_SCALING * slim.conv2d(icnv3, 1, [3, 3], stride=1,
+                                               activation_fn=tf.sigmoid, normalizer_fn=None, scope='disp3') + MIN_DISP
+            disp3_up = tf.image.resize_bilinear(disp3, [np.int(H / 2), np.int(W / 2)])
+
+            upcnv2 = slim.conv2d_transpose(icnv3, 32, [3, 3], stride=2, scope='upcnv2')
+            i2_in = tf.concat([upcnv2, cnv1b, disp3_up], axis=3)
+            icnv2 = slim.conv2d(i2_in, 32, [3, 3], stride=1, scope='icnv2')
+            disp2 = DISP_SCALING * slim.conv2d(icnv2, 1, [3, 3], stride=1,
+                                               activation_fn=tf.sigmoid, normalizer_fn=None, scope='disp2') + MIN_DISP
+            disp2_up = tf.image.resize_bilinear(disp2, [H, W])
+
+            upcnv1 = slim.conv2d_transpose(icnv2, 16, [3, 3], stride=2, scope='upcnv1')
+            i1_in = tf.concat([upcnv1, disp2_up], axis=3)
+            icnv1 = slim.conv2d(i1_in, 16, [3, 3], stride=1, scope='icnv1')
+            disp1 = DISP_SCALING * slim.conv2d(icnv1, 1, [3, 3], stride=1,
+                                               activation_fn=tf.sigmoid, normalizer_fn=None, scope='disp1') + MIN_DISP
+
+            end_points = utils.convert_collection_to_dict(end_points_collection)
+            return [disp1, disp2, disp3, disp4], end_points
+
+
+def load_image_sequence(dataset_dir, frames,  tgt_idx, seq_length, img_height, img_width):
+    half_offset = int((seq_length - 1)/2)
+    for o in range(-half_offset, half_offset+1):
+        curr_idx = tgt_idx + o
+        curr_drive, curr_frame_id = frames[curr_idx].split(' ')
+        img_file = os.path.join(
+            dataset_dir, 'sequences', '%s/image_2/%s.png' % (curr_drive, curr_frame_id))
+        curr_img = scipy.misc.imread(img_file)
+        curr_img = scipy.misc.imresize(curr_img, (img_height, img_width))
+        if o == -half_offset:
+            image_seq = curr_img
+        else:
+            image_seq = np.hstack((image_seq, curr_img))
+    return image_seq
+
+
+def is_valid_sample(frames, tgt_idx, seq_length):
+    N = len(frames)
+    tgt_drive, _ = frames[tgt_idx].split(' ')
+    max_src_offset = int((seq_length - 1)/2)
+    min_src_idx = tgt_idx - max_src_offset
+    max_src_idx = tgt_idx + max_src_offset
+    if min_src_idx < 0 or max_src_idx >= N:
+        return False
+    # TODO: unnecessary to check if the drives match
+    min_src_drive, _ = frames[min_src_idx].split(' ')
+    max_src_drive, _ = frames[max_src_idx].split(' ')
+    if tgt_drive == min_src_drive and tgt_drive == max_src_drive:
+        return True
+    return False
+
 
 class SfMLearner(object):
     def __init__(self):
@@ -28,8 +233,7 @@ class SfMLearner(object):
             src_image_stack = self.preprocess_image(src_image_stack)
 
         with tf.name_scope("depth_prediction"):
-            pred_disp, depth_net_endpoints = disp_net(tgt_image, 
-                                                      is_training=True)
+            pred_disp, depth_net_endpoints = disp_net(tgt_image, is_training=True)
             pred_depth = [1./d for d in pred_disp]
 
         with tf.name_scope("pose_and_explainability_prediction"):
@@ -300,12 +504,7 @@ class SfMLearner(object):
         image = (image + 1.)/2.
         return tf.image.convert_image_dtype(image, dtype=tf.uint8)
 
-    def setup_inference(self, 
-                        img_height,
-                        img_width,
-                        mode,
-                        seq_length=3,
-                        batch_size=1):
+    def setup_inference(self, img_height, img_width, mode, seq_length=3, batch_size=1):
         self.img_height = img_height
         self.img_width = img_width
         self.mode = mode
@@ -336,3 +535,124 @@ class SfMLearner(object):
             self.saver.save(sess, 
                             os.path.join(checkpoint_dir, model_name),
                             global_step=step)
+
+
+
+
+
+def model_train_all():
+    seed = 8964
+    tf.set_random_seed(seed)
+    np.random.seed(seed)
+    random.seed(seed)
+
+    pp = pprint.PrettyPrinter()
+    pp.pprint(flags.FLAGS.__flags)
+
+    if not os.path.exists(FLAGS.checkpoint_dir):
+        os.makedirs(FLAGS.checkpoint_dir)
+
+    sfm = SfMLearner()
+    sfm.train(FLAGS)
+
+
+def model_test_depth():
+    with open('data/kitti/test_files_eigen.txt', 'r') as f:
+        test_files = f.readlines()
+        test_files = [FLAGS.dataset_dir + t[:-1] for t in test_files]
+    if not os.path.exists(FLAGS.output_dir):
+        os.makedirs(FLAGS.output_dir)
+    basename = os.path.basename(FLAGS.ckpt_file)
+    output_file = FLAGS.output_dir + '/' + basename
+    sfm = SfMLearner()
+    sfm.setup_inference(img_height=FLAGS.img_height,
+                        img_width=FLAGS.img_width,
+                        batch_size=FLAGS.batch_size,
+                        mode='depth')
+    saver = tf.train.Saver([var for var in tf.model_variables()])
+    config = tf.ConfigProto()
+    config.gpu_options.allow_growth = True
+    with tf.Session(config=config) as sess:
+        saver.restore(sess, FLAGS.ckpt_file)
+        pred_all = []
+        for t in range(0, len(test_files), FLAGS.batch_size):
+            if t % 100 == 0:
+                print('processing %s: %d/%d' % (basename, t, len(test_files)))
+            inputs = np.zeros(
+                (FLAGS.batch_size, FLAGS.img_height, FLAGS.img_width, 3),
+                dtype=np.uint8)
+            for b in range(FLAGS.batch_size):
+                idx = t + b
+                if idx >= len(test_files):
+                    break
+                fh = open(test_files[idx],
+                          'rb')  # to fix the UnicodeDecodeError about utf8,change 'r' to 'rb',by jiafeng5513
+                raw_im = pil.open(fh)
+                scaled_im = raw_im.resize((FLAGS.img_width, FLAGS.img_height), pil.ANTIALIAS)
+                inputs[b] = np.array(scaled_im)
+                # im = scipy.misc.imread(test_files[idx])
+                # inputs[b] = scipy.misc.imresize(im, (FLAGS.img_height, FLAGS.img_width))
+            pred = sfm.inference(inputs, sess, mode='depth')
+            for b in range(FLAGS.batch_size):
+                idx = t + b
+                if idx >= len(test_files):
+                    break
+                pred_all.append(pred['depth'][b, :, :, 0])
+        np.save(output_file, pred_all)
+    pass
+
+
+def model_test_pose():
+    sfm = SfMLearner()
+    sfm.setup_inference(FLAGS.img_height,
+                        FLAGS.img_width,
+                        'pose',
+                        FLAGS.seq_length)
+    saver = tf.train.Saver([var for var in tf.trainable_variables()])
+
+    if not os.path.isdir(FLAGS.output_dir):
+        os.makedirs(FLAGS.output_dir)
+    seq_dir = os.path.join(FLAGS.dataset_dir, 'sequences', '%.2d' % FLAGS.test_seq)
+    img_dir = os.path.join(seq_dir, 'image_2')
+    N = len(glob(img_dir + '/*.png'))
+    test_frames = ['%.2d %.6d' % (FLAGS.test_seq, n) for n in range(N)]
+    with open(FLAGS.dataset_dir + 'sequences/%.2d/times.txt' % FLAGS.test_seq, 'r') as f:
+        times = f.readlines()
+    times = np.array([float(s[:-1]) for s in times])
+    max_src_offset = (FLAGS.seq_length - 1) // 2
+    with tf.Session() as sess:
+        saver.restore(sess, FLAGS.ckpt_file)
+        for tgt_idx in range(N):
+            if not is_valid_sample(test_frames, tgt_idx, FLAGS.seq_length):
+                continue
+            if tgt_idx % 100 == 0:
+                print('Progress: %d/%d' % (tgt_idx, N))
+            # TODO: currently assuming batch_size = 1
+            image_seq = load_image_sequence(FLAGS.dataset_dir,
+                                            test_frames,
+                                            tgt_idx,
+                                            FLAGS.seq_length,
+                                            FLAGS.img_height,
+                                            FLAGS.img_width)
+            pred = sfm.inference(image_seq[None, :, :, :], sess, mode='pose')
+            pred_poses = pred['pose'][0]
+            # Insert the target pose [0, 0, 0, 0, 0, 0]
+            pred_poses = np.insert(pred_poses, max_src_offset, np.zeros((1, 6)), axis=0)
+            curr_times = times[tgt_idx - max_src_offset:tgt_idx + max_src_offset + 1]
+            out_file = FLAGS.output_dir + '%.6d.txt' % (tgt_idx - max_src_offset)
+            dump_pose_seq_TUM(out_file, pred_poses, curr_times)
+    pass
+
+
+def main(_):
+    if FLAGS.run_mode == 0:
+        model_train_all()
+    elif FLAGS.run_mode == 1:
+        model_test_depth()
+    elif FLAGS.run_mode == 2:
+        model_test_pose()
+    pass
+
+
+if __name__ == '__main__':
+    tf.app.run()
