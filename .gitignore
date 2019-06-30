@@ -805,37 +805,11 @@ local.properties
 /E-Net/checkpoints/
 *.tar
 /SfMLearner/checkpoints/
-将删除 SfMLearner/checkpoints/checkpoint
-将删除 SfMLearner/checkpoints/events.out.tfevents.1559654886.GpuServer
-将删除 SfMLearner/checkpoints/graph.pbtxt
-将删除 SfMLearner/checkpoints/model-110682.data-00000-of-00001
-将删除 SfMLearner/checkpoints/model-110682.index
-将删除 SfMLearner/checkpoints/model-120744.data-00000-of-00001
-将删除 SfMLearner/checkpoints/model-120744.index
-将删除 SfMLearner/checkpoints/model-130806.data-00000-of-00001
-将删除 SfMLearner/checkpoints/model-130806.index
-将删除 SfMLearner/checkpoints/model-140868.data-00000-of-00001
-将删除 SfMLearner/checkpoints/model-140868.index
-将删除 SfMLearner/checkpoints/model-150930.data-00000-of-00001
-将删除 SfMLearner/checkpoints/model-150930.index
-将删除 SfMLearner/checkpoints/model-160992.data-00000-of-00001
-将删除 SfMLearner/checkpoints/model-160992.index
-将删除 SfMLearner/checkpoints/model-171054.data-00000-of-00001
-将删除 SfMLearner/checkpoints/model-171054.index
-将删除 SfMLearner/checkpoints/model-181116.data-00000-of-00001
-将删除 SfMLearner/checkpoints/model-181116.index
-将删除 SfMLearner/checkpoints/model-191178.data-00000-of-00001
-将删除 SfMLearner/checkpoints/model-191178.index
-将删除 SfMLearner/checkpoints/model.latest.data-00000-of-00001
-将删除 SfMLearner/checkpoints/model.latest.index
-将删除 SfMLearner/kitti_eval/kitti_eigen_depth_predictions.npy
-将删除 utils/benchmark-orientation/matlab/external/src/freak-master/originalFreakDescriptor
+
 *.npy
 /SfMLearner/kitti_eval/pose_data/
-将删除 SfMLearner/kitti_eval/pose_data/
+
 /SfMLearner/test_output/
-将删除 SfMLearner/models/kitti_depth_model/model-190532.data-00000-of-00001
-将删除 SfMLearner/models/kitti_depth_model/model-190532.index
-将删除 SfMLearner/models/kitti_pose_model/model-100280.data-00000-of-00001
-将删除 SfMLearner/models/kitti_pose_model/model-100280.index
-将删除 SfMLearner/test_output/test_pose/
+
+!/SfMLearner/Scripts/
+!*.sh
