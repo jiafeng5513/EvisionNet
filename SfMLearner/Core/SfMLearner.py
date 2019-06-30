@@ -14,7 +14,7 @@ import scipy.misc
 from tensorflow.contrib.layers.python.layers import utils
 from glob import glob
 from kitti_eval.pose_evaluation_utils import dump_pose_seq_TUM
-from Core.data_loader import DataLoader
+from data_loader import DataLoader
 from utils import *
 
 # Range of disparity/inverse depth values

@@ -235,7 +235,6 @@ TSWLatexianTemp*
 *~[0-9]*
 
 # auto folder when using emacs and auctex
-./auto/*
 *.el
 
 # expex forward references with \gathertags
@@ -245,7 +244,6 @@ TSWLatexianTemp*
 *.sta
 
 # generated if using elsarticle.cls
-*.spl
 ### Python template
 # Byte-compiled / optimized / DLL files
 __pycache__/
@@ -301,7 +299,6 @@ coverage.xml
 *.pot
 
 # Django stuff:
-*.log
 local_settings.py
 db.sqlite3
 
@@ -354,7 +351,6 @@ venv.bak/
 ### VirtualEnv template
 # Virtualenv
 # http://iamzed.com/2009/05/07/a-primer-on-virtualenv/
-.Python
 [Bb]in
 [Ii]nclude
 [Ll]ib
@@ -362,7 +358,6 @@ venv.bak/
 [Ll]ocal
 [Ss]cripts
 pyvenv.cfg
-.venv
 pip-selfcheck.json
 ### VisualStudio template
 ## Ignore Visual Studio temporary files, build results, and
@@ -443,7 +438,6 @@ StyleCopReport.xml
 *.tlh
 *.tmp
 *.tmp_proj
-*.log
 *.vspscc
 *.vssscc
 .builds
@@ -661,7 +655,6 @@ paket-files/
 .cr/
 
 # Python Tools for Visual Studio (PTVS)
-__pycache__/
 *.pyc
 
 # Cake - Uncomment if you are using it
@@ -752,8 +745,6 @@ fabric.properties
 .metadata
 bin/
 tmp/
-*.tmp
-*.bak
 *.swp
 *~.nib
 local.properties
@@ -802,14 +793,14 @@ local.properties
 .scala_dependencies
 .worksheet
 
-/E-Net/checkpoints/
+
 *.tar
-/SfMLearner/checkpoints/
-
 *.npy
-/SfMLearner/kitti_eval/pose_data/
-
+/SfMLearner/checkpoints/
 /SfMLearner/test_output/
+/SfMLearner/Core/kitti_eval/pose_data/
+/SfMLearner/models/depth_model
+/SfMLearner/models/pose_model
 
 !/SfMLearner/Scripts/
 !*.sh
