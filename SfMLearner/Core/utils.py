@@ -422,6 +422,15 @@ def evaluate_depth(pred_depths,test_file_list,kitti_dir,min_depth,max_depth):
 
 
 def evaluate_pose(pred_dir,gtruth_dir):
+    """
+    BUG:gt for pose evaluate is rely on  pose_eval_data.tar,
+        we do not know the way used for generate the gt in the tar,
+        sln 1:use 09 and 10 seq for test forever
+        sln 2:find out the way to generate gt.
+    :param pred_dir:
+    :param gtruth_dir:
+    :return:
+    """
     pred_files = glob(pred_dir + '/*.txt')
     ate_all = []
     for i in range(len(pred_files)):
