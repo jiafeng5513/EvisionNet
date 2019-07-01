@@ -1,13 +1,18 @@
 from __future__ import division
+import tensorflow as tf
 import matplotlib.pyplot as plt
 import numpy as np
-import tensorflow as tf
 import wget, tarfile
 import os
 import urllib
 import tqdm
 import sys
 import requests
+from depth_evaluation_utils import *
+from glob import glob
+from pose_evaluation_utils import *
+from utils import *
+
 
 def gray2rgb(im, cmap='gray'):
     cmap = plt.get_cmap(cmap)
@@ -303,6 +308,7 @@ def bilinear_sampler(imgs, coords):
         ])
         return output
 
+
 def download(url, file_path):
     # 第一次请求是为了得到文件总大小
     r1 = requests.get(url, stream=True, verify=False)
@@ -335,3 +341,96 @@ def download(url, file_path):
                 sys.stdout.write("\r[%s%s] %d%%" % ('█' * done, ' ' * (50 - done), 100 * temp_size / total_size))
                 sys.stdout.flush()
     print()  # 避免上面\r 回车符
+
+
+def evaluate_depth(pred_depths,test_file_list,kitti_dir,min_depth,max_depth):
+    """
+    evaluate the test result of depth net
+    :param pred_file:
+    :param test_file_list:
+    :param kitti_dir:
+    :param min_depth:
+    :param max_depth:
+    :return:
+    """
+    #pred_depths = np.load(pred_file)
+    test_files = read_text_lines(test_file_list)
+    gt_files, gt_calib, im_sizes, im_files, cams = read_file_data(test_files, kitti_dir)
+    num_test = len(im_files)
+    gt_depths = []
+    pred_depths_resized = []
+    for t_id in range(num_test):
+        camera_id = cams[t_id]  # 2 is left, 3 is right
+        pred_depths_resized.append(
+            cv2.resize(pred_depths[t_id],
+                       (im_sizes[t_id][1], im_sizes[t_id][0]),
+                       interpolation=cv2.INTER_LINEAR))
+        depth = generate_depth_map(gt_calib[t_id],
+                                   gt_files[t_id],
+                                   im_sizes[t_id],
+                                   camera_id,
+                                   False,
+                                   True)
+        gt_depths.append(depth.astype(np.float32))
+    pred_depths = pred_depths_resized
+
+    rms = np.zeros(num_test, np.float32)
+    log_rms = np.zeros(num_test, np.float32)
+    abs_rel = np.zeros(num_test, np.float32)
+    sq_rel = np.zeros(num_test, np.float32)
+    d1_all = np.zeros(num_test, np.float32)
+    a1 = np.zeros(num_test, np.float32)
+    a2 = np.zeros(num_test, np.float32)
+    a3 = np.zeros(num_test, np.float32)
+    for i in range(num_test):
+        gt_depth = gt_depths[i]
+        pred_depth = np.copy(pred_depths[i])
+
+        mask = np.logical_and(gt_depth > min_depth, gt_depth < max_depth)
+        # crop used by Garg ECCV16 to reprocude Eigen NIPS14 results
+        # if used on gt_size 370x1224 produces a crop of [-218, -3, 44, 1180]
+        gt_height, gt_width = gt_depth.shape
+        crop = np.array([0.40810811 * gt_height, 0.99189189 * gt_height,
+                         0.03594771 * gt_width, 0.96405229 * gt_width]).astype(np.int32)
+
+        crop_mask = np.zeros(mask.shape)
+        crop_mask[crop[0]:crop[1], crop[2]:crop[3]] = 1
+        mask = np.logical_and(mask, crop_mask)
+
+        # Scale matching
+        scalor = np.median(gt_depth[mask]) / np.median(pred_depth[mask])
+        pred_depth[mask] *= scalor
+
+        pred_depth[pred_depth < min_depth] = min_depth
+        pred_depth[pred_depth > max_depth] = max_depth
+        abs_rel[i], sq_rel[i], rms[i], log_rms[i], a1[i], a2[i], a3[i] = \
+            compute_errors(gt_depth[mask], pred_depth[mask])
+
+    print("{:>10}, {:>10}, {:>10}, {:>10}, {:>10}, {:>10}, {:>10}, {:>10}".format('abs_rel', 'sq_rel', 'rms', 'log_rms',
+                                                                                  'd1_all', 'a1', 'a2', 'a3'))
+    print("{:10.4f}, {:10.4f}, {:10.4f}, {:10.4f}, {:10.4f}, {:10.4f}, {:10.4f}, {:10.4f}".format(abs_rel.mean(),
+                                                                                                  sq_rel.mean(),
+                                                                                                  rms.mean(),
+                                                                                                  log_rms.mean(),
+                                                                                                  d1_all.mean(),
+                                                                                                  a1.mean(), a2.mean(),
+                                                                                                  a3.mean()))
+
+    pass
+
+
+def evaluate_pose(pred_dir,gtruth_dir):
+    pred_files = glob(pred_dir + '/*.txt')
+    ate_all = []
+    for i in range(len(pred_files)):
+        gtruth_file = gtruth_dir + os.path.basename(pred_files[i])
+        if not os.path.exists(gtruth_file):
+            continue
+        ate = compute_ate(gtruth_file, pred_files[i])
+        if ate == False:
+            continue
+        ate_all.append(ate)
+    ate_all = np.array(ate_all)
+    print("Predictions dir: %s" % pred_dir)
+    print("ATE mean: %.4f, std: %.4f" % (np.mean(ate_all), np.std(ate_all)))
+    pass

@@ -7,10 +7,9 @@ import pprint
 import random
 import PIL.Image as pil
 import scipy.misc
-
+from pose_evaluation_utils import dump_pose_seq_TUM
 from tensorflow.contrib.layers.python.layers import utils
 from glob import glob
-from SfMLearner.Core import dump_pose_seq_TUM
 from data_loader import DataLoader
 from utils import *
 
@@ -39,6 +38,18 @@ flags.DEFINE_boolean("continue_train", False, "Continue training from previous c
 flags.DEFINE_string("output_dir", "../test_output/test_pose/", "Output directory")
 flags.DEFINE_string("ckpt_file", "../checkpoints/model-191178", "checkpoint file")
 flags.DEFINE_integer("test_seq", 3, "Sequence id to test")
+
+flags.DEFINE_string("kitti_dir","/home/RAID1/DataSet/KITTI/KittiRaw/",'Path to the KITTI dataset directory')
+flags.DEFINE_string("pred_file","../Core/kitti_eval/kitti_eigen_depth_predictions.npy","Path to the prediction file")
+flags.DEFINE_string("test_file_list",'../data/kitti/test_files_eigen.txt',"Path to the list of test files")
+flags.DEFINE_float("min_depth",1e-3,"Threshold for minimum depth")
+flags.DEFINE_float("max_depth",80,"Threshold for maximum depth")
+
+flags.DEFINE_string("gtruth_dir","../Core/kitti_eval/pose_data/ground_truth/09/",
+                    'Path to the directory with ground-truth trajectories')
+flags.DEFINE_string("pred_dir","../Core/kitti_eval/pose_data/ours_results/09/",
+                    "Path to the directory with predicted trajectories")
+
 # add by jiafeng5513,followed by https://github.com/tinghuiz/SfMLearner/pull/70
 flags.DEFINE_integer("num_source", None, "number of source images")
 flags.DEFINE_integer("num_scales", None, "number of used image scales")
@@ -581,13 +592,10 @@ def model_train_all():
 
 
 def model_test_depth():
-    with open('../data/kitti/test_files_eigen.txt', 'r') as f:
+    with open(FLAGS.test_file_list, 'r') as f:
         test_files = f.readlines()
         test_files = [FLAGS.dataset_dir + t[:-1] for t in test_files]
-    if not os.path.exists(FLAGS.output_dir):
-        os.makedirs(FLAGS.output_dir)
     basename = os.path.basename(FLAGS.ckpt_file)
-    output_file = FLAGS.output_dir + '/' + basename
     sfm = SfMLearner()
     sfm.setup_inference(img_height=FLAGS.img_height,
                         img_width=FLAGS.img_width,
@@ -609,8 +617,7 @@ def model_test_depth():
                 idx = t + b
                 if idx >= len(test_files):
                     break
-                fh = open(test_files[idx],
-                          'rb')  # to fix the UnicodeDecodeError about utf8,change 'r' to 'rb',by jiafeng5513
+                fh = open(test_files[idx],'rb')  # to fix the UnicodeDecodeError about utf8,change 'r' to 'rb'
                 raw_im = pil.open(fh)
                 scaled_im = raw_im.resize((FLAGS.img_width, FLAGS.img_height), pil.ANTIALIAS)
                 inputs[b] = np.array(scaled_im)
@@ -622,7 +629,10 @@ def model_test_depth():
                 if idx >= len(test_files):
                     break
                 pred_all.append(pred['depth'][b, :, :, 0])
-        np.save(output_file, pred_all)
+        evaluate_depth(pred_all,FLAGS.test_file_list,
+                                FLAGS.kitti_dir,
+                                FLAGS.min_depth,
+                                FLAGS.max_depth)
     pass
 
 
@@ -665,6 +675,7 @@ def model_test_pose():
             curr_times = times[tgt_idx - max_src_offset:tgt_idx + max_src_offset + 1]
             out_file = FLAGS.output_dir + '%.6d.txt' % (tgt_idx - max_src_offset)
             dump_pose_seq_TUM(out_file, pred_poses, curr_times)
+    evaluate_pose(FLAGS.pred_dir, FLAGS.gtruth_dir)
     pass
 
 
