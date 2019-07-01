@@ -376,7 +376,6 @@ def evaluate_depth(pred_depths,test_file_list,kitti_dir,min_depth,max_depth):
     log_rms = np.zeros(num_test, np.float32)
     abs_rel = np.zeros(num_test, np.float32)
     sq_rel = np.zeros(num_test, np.float32)
-    d1_all = np.zeros(num_test, np.float32)
     a1 = np.zeros(num_test, np.float32)
     a2 = np.zeros(num_test, np.float32)
     a3 = np.zeros(num_test, np.float32)
@@ -404,23 +403,21 @@ def evaluate_depth(pred_depths,test_file_list,kitti_dir,min_depth,max_depth):
         abs_rel[i], sq_rel[i], rms[i], log_rms[i], a1[i], a2[i], a3[i] = \
             compute_errors(gt_depth[mask], pred_depth[mask])
 
-    # abs_rel : Relative absolute error (percent)
-    # sq_rel  : Relative squared error (percent)
-    # rms     : Root mean squared error of the inverse depth [1/km]
-    # log_rms :
-    # d1_all  :
-    # a1      :
-    # a2      :
-    # a3      :
+    print("{:>10}, {:>10}, {:>10}, {:>10}, {:>10}, {:>10},  {:>10}"\
+            .format('abs_rel', 'sq_rel', 'rms', 'log_rms',  'a1', 'a2', 'a3'))
 
+    print("{:10.4f}, {:10.4f}, {:10.4f}, {:10.4f}, {:10.4f}, {:10.4f}, {:10.4f}"\
+          .format(abs_rel.mean(), sq_rel.mean(), rms.mean(), log_rms.mean(), a1.mean(), a2.mean(),a3.mean()))
 
-    print("{:>10}, {:>10}, {:>10}, {:>10}, {:>10}, {:>10}, {:>10}, {:>10}".format(
-                                'abs_rel', 'sq_rel', 'rms', 'log_rms', 'd1_all', 'a1', 'a2', 'a3'))
-
-    print("{:10.4f}, {:10.4f}, {:10.4f}, {:10.4f}, {:10.4f}, {:10.4f}, {:10.4f}, {:10.4f}"\
-          .format(abs_rel.mean(), sq_rel.mean(), rms.mean(), log_rms.mean(), d1_all.mean(),
-                  a1.mean(), a2.mean(),a3.mean()))
-
+    print("最终输出的值都是整个测试集上所有图片取均值之后的结果")
+    print("abs_rel : (|gt-pred|/gt).mean")
+    print("sq_rel  : ((gt-pred)^2/gt).mean")
+    print("rms     : sqrt(((gt-pred)^2).mean)")
+    print("log_rms : sqrt(((log(gt)-log(pred))^2).mean)")
+    print("        thresh=np.maximum((gt / pred), (pred / gt))")
+    print("a1      : (thresh<1.25  ).mean")
+    print("a2      : (thresh<1.25^2).mean")
+    print("a3      : (thresh<1.25^3).mean")
     pass
 
 
