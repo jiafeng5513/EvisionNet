@@ -56,6 +56,39 @@ def resize_like(inputs, ref):
     return tf.image.resize_nearest_neighbor(inputs, [rH.value, rW.value])
 
 
+def _variable_with_weight_decay(name, shape, stddev, wd):
+    """创建一个带有权重衰减的初始化变量。注意变量是用截断的正态分布初始化的。 仅在指定了权重衰减时才添加权重衰减。
+    Args:
+      name:   变量名
+      shape:  变量shape, list of ints
+      stddev: 截断高斯分布的标准差
+      wd:     添加L2Loss权重衰减,乘以此浮点数.如果为None,则不为此变量添加权重衰减.
+    Returns:
+      Variable Tensor
+    """
+    dtype = tf.float32
+    var = _variable_on_cpu(name, shape, tf.truncated_normal_initializer(stddev=stddev, dtype=dtype))
+    if wd is not None:
+        weight_decay = tf.multiply(tf.nn.l2_loss(var), wd, name='weight_loss')
+        tf.add_to_collection('losses', weight_decay)
+    return var
+
+
+def _variable_on_cpu(name, shape, initializer):
+    """创建在主存(CPU内存)中存储的变量.
+    Args:
+      name: 变量名
+      shape: list of ints
+      initializer: 初始化器
+    Returns:
+      Variable Tensor
+    """
+    with tf.device('/cpu:0'):
+        dtype = tf.float32
+        var = tf.get_variable(name, shape, initializer=initializer, dtype=dtype)
+    return var
+
+
 def pose_exp_net(tgt_image, src_image_stack, do_exp=True, is_training=True):
     inputs = tf.concat([tgt_image, src_image_stack], axis=3)
     H = inputs.get_shape()[1].value
@@ -556,7 +589,7 @@ def model_train_all():
 
 
 def model_test_depth():
-    with open('data/kitti/test_files_eigen.txt', 'r') as f:
+    with open('../data/kitti/test_files_eigen.txt', 'r') as f:
         test_files = f.readlines()
         test_files = [FLAGS.dataset_dir + t[:-1] for t in test_files]
     if not os.path.exists(FLAGS.output_dir):
