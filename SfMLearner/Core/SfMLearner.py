@@ -1,10 +1,7 @@
 # -*- coding: utf-8 -*-
 from __future__ import division
-import os
 import time
 import math
-import numpy as np
-import tensorflow as tf
 import tensorflow.contrib.slim as slim
 import pprint
 import random
@@ -13,7 +10,7 @@ import scipy.misc
 
 from tensorflow.contrib.layers.python.layers import utils
 from glob import glob
-from kitti_eval.pose_evaluation_utils import dump_pose_seq_TUM
+from SfMLearner.Core import dump_pose_seq_TUM
 from data_loader import DataLoader
 from utils import *
 
@@ -22,26 +19,26 @@ DISP_SCALING = 10
 MIN_DISP = 0.01
 
 flags = tf.app.flags
-flags.DEFINE_integer("run_mode", 0, "0=train,1=test_depth,2=test_pose")
-flags.DEFINE_string("dataset_dir", "", "Dataset directory")
+flags.DEFINE_integer("run_mode", 2, "0=train,1=test_depth,2=test_pose")
+flags.DEFINE_string("dataset_dir", "/home/RAID1/DataSet/KITTI/KittiOdometry/", "Dataset directory")
 flags.DEFINE_string("checkpoint_dir", "./checkpoints/", "Directory name to save the checkpoints")
 flags.DEFINE_string("init_checkpoint_file", None, "Specific checkpoint file to initialize from")
 flags.DEFINE_float("learning_rate", 0.0002, "Learning rate of for adam")
 flags.DEFINE_float("beta1", 0.9, "Momentum term of adam")
 flags.DEFINE_float("smooth_weight", 0.5, "Weight for smoothness")
 flags.DEFINE_float("explain_reg_weight", 0.0, "Weight for explanability regularization")
-flags.DEFINE_integer("batch_size", 4, "The size of of a sample batch")
+flags.DEFINE_integer("batch_size", 1, "The size of of a sample batch")
 flags.DEFINE_integer("img_height", 128, "Image height")
 flags.DEFINE_integer("img_width", 416, "Image width")
-flags.DEFINE_integer("seq_length", 3, "Sequence length for each example")
+flags.DEFINE_integer("seq_length", 5, "Sequence length for each example")
 flags.DEFINE_integer("max_steps", 200000, "Maximum number of training iterations")
 flags.DEFINE_integer("summary_freq", 100, "Logging every log_freq iterations")
 flags.DEFINE_integer("save_latest_freq", 5000, \
                      "Save the latest model every save_latest_freq iterations (overwrites the previous latest model)")
 flags.DEFINE_boolean("continue_train", False, "Continue training from previous checkpoint")
-flags.DEFINE_string("output_dir", None, "Output directory")
-flags.DEFINE_string("ckpt_file", None, "checkpoint file")
-flags.DEFINE_integer("test_seq", 9, "Sequence id to test")
+flags.DEFINE_string("output_dir", "../test_output/test_pose/", "Output directory")
+flags.DEFINE_string("ckpt_file", "../checkpoints/model-191178", "checkpoint file")
+flags.DEFINE_integer("test_seq", 3, "Sequence id to test")
 # add by jiafeng5513,followed by https://github.com/tinghuiz/SfMLearner/pull/70
 flags.DEFINE_integer("num_source", None, "number of source images")
 flags.DEFINE_integer("num_scales", None, "number of used image scales")
@@ -95,12 +92,12 @@ def pose_exp_net(tgt_image, src_image_stack, do_exp=True, is_training=True):
     W = inputs.get_shape()[2].value
     num_source = int(src_image_stack.get_shape()[3].value // 3)
     with tf.variable_scope('pose_exp_net') as sc:
-        end_points_collection = sc.original_name_scope + '_end_points'
+        #end_points_collection = sc.original_name_scope + '_end_points'
         with slim.arg_scope([slim.conv2d, slim.conv2d_transpose],
                             normalizer_fn=None,
                             weights_regularizer=slim.l2_regularizer(0.05),
                             activation_fn=tf.nn.relu,
-                            outputs_collections=end_points_collection):
+                            outputs_collections=None):
             # cnv1 to cnv5b are shared between pose and explainability prediction
             cnv1 = slim.conv2d(inputs, 16, [7, 7], stride=2, scope='cnv1')
             cnv2 = slim.conv2d(cnv1, 32, [5, 5], stride=2, scope='cnv2')
@@ -142,8 +139,8 @@ def pose_exp_net(tgt_image, src_image_stack, do_exp=True, is_training=True):
                 mask2 = None
                 mask3 = None
                 mask4 = None
-            end_points = utils.convert_collection_to_dict(end_points_collection)
-            return pose_final, [mask1, mask2, mask3, mask4], end_points
+            #end_points = utils.convert_collection_to_dict(end_points_collection)
+            return pose_final, [mask1, mask2, mask3, mask4]  #, end_points
 
 
 def disp_net(tgt_image, is_training=True):
@@ -271,12 +268,10 @@ class SfMLearner(object):
             pred_disp, depth_net_endpoints = disp_net(tgt_image, is_training=True)
             pred_depth = [1./d for d in pred_disp]
 
-        with tf.name_scope("pose_and_explainability_prediction"):
-            pred_poses, pred_exp_logits, pose_exp_net_endpoints = \
-                pose_exp_net(tgt_image,
-                             src_image_stack, 
-                             do_exp=(opt.explain_reg_weight > 0),
-                             is_training=True)
+        with tf.name_scope("pose_and_explainability_prediction"):  # , pose_exp_net_endpoints
+            pred_poses, pred_exp_logits = pose_exp_net(tgt_image,src_image_stack,
+                                                        do_exp=(opt.explain_reg_weight > 0),
+                                                        is_training=True)
 
         with tf.name_scope("compute_loss"):
             pixel_loss = 0
@@ -515,17 +510,14 @@ class SfMLearner(object):
         self.depth_epts = depth_net_endpoints
 
     def build_pose_test_graph(self):
-        input_uint8 = tf.placeholder(tf.uint8, [self.batch_size, 
-            self.img_height, self.img_width * self.seq_length, 3], 
-            name='raw_input')
+        input_uint8 = tf.placeholder(tf.uint8, [self.batch_size, self.img_height, self.img_width * self.seq_length, 3],
+                                     name='raw_input')
         input_mc = self.preprocess_image(input_uint8)
         loader = DataLoader()
-        tgt_image, src_image_stack = \
-            loader.batch_unpack_image_sequence(
+        tgt_image, src_image_stack = loader.batch_unpack_image_sequence(
                 input_mc, self.img_height, self.img_width, self.num_source)
         with tf.name_scope("pose_prediction"):
-            pred_poses, _, _ = pose_exp_net(
-                tgt_image, src_image_stack, do_exp=False, is_training=False)
+            pred_poses, _= pose_exp_net(tgt_image, src_image_stack, do_exp=False, is_training=False)
             self.inputs = input_uint8
             self.pred_poses = pred_poses
 
@@ -636,10 +628,10 @@ def model_test_depth():
 
 def model_test_pose():
     sfm = SfMLearner()
-    sfm.setup_inference(FLAGS.img_height,
-                        FLAGS.img_width,
-                        'pose',
-                        FLAGS.seq_length)
+    sfm.setup_inference(img_height=FLAGS.img_height,
+                        img_width=FLAGS.img_width,
+                        mode='pose',
+                        seq_length=FLAGS.seq_length)
     saver = tf.train.Saver([var for var in tf.trainable_variables()])
 
     if not os.path.isdir(FLAGS.output_dir):
