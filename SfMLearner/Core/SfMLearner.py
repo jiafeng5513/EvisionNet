@@ -37,18 +37,19 @@ flags.DEFINE_integer("save_latest_freq", 5000, \
 flags.DEFINE_boolean("continue_train", False, "Continue training from previous checkpoint")
 flags.DEFINE_string("output_dir", "../test_output/test_pose/", "Output directory")
 flags.DEFINE_string("ckpt_file", "../checkpoints/model-191178", "checkpoint file")
-flags.DEFINE_integer("test_seq", 3, "Sequence id to test")
 
+# params for model_test_depth
 flags.DEFINE_string("kitti_dir","/home/RAID1/DataSet/KITTI/KittiRaw/",'Path to the KITTI dataset directory')
-flags.DEFINE_string("pred_file","../Core/kitti_eval/kitti_eigen_depth_predictions.npy","Path to the prediction file")
 flags.DEFINE_string("test_file_list",'../data/kitti/test_files_eigen.txt',"Path to the list of test files")
 flags.DEFINE_float("min_depth",1e-3,"Threshold for minimum depth")
 flags.DEFINE_float("max_depth",80,"Threshold for maximum depth")
 
+# params for model_test_pose
+flags.DEFINE_integer("test_seq", 9, "Sequence id to test")  # pick from 22 sequences in KittiOdometry
 flags.DEFINE_string("gtruth_dir","../Core/kitti_eval/pose_data/ground_truth/09/",
-                    'Path to the directory with ground-truth trajectories')
+                                'Path to the directory with ground-truth trajectories')
 flags.DEFINE_string("pred_dir","../Core/kitti_eval/pose_data/ours_results/09/",
-                    "Path to the directory with predicted trajectories")
+                                "Path to the directory with predicted trajectories")
 
 # add by jiafeng5513,followed by https://github.com/tinghuiz/SfMLearner/pull/70
 flags.DEFINE_integer("num_source", None, "number of source images")

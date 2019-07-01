@@ -2,9 +2,7 @@ from __future__ import division
 import tensorflow as tf
 import matplotlib.pyplot as plt
 import numpy as np
-import wget, tarfile
 import os
-import urllib
 import tqdm
 import sys
 import requests
@@ -406,15 +404,22 @@ def evaluate_depth(pred_depths,test_file_list,kitti_dir,min_depth,max_depth):
         abs_rel[i], sq_rel[i], rms[i], log_rms[i], a1[i], a2[i], a3[i] = \
             compute_errors(gt_depth[mask], pred_depth[mask])
 
-    print("{:>10}, {:>10}, {:>10}, {:>10}, {:>10}, {:>10}, {:>10}, {:>10}".format('abs_rel', 'sq_rel', 'rms', 'log_rms',
-                                                                                  'd1_all', 'a1', 'a2', 'a3'))
-    print("{:10.4f}, {:10.4f}, {:10.4f}, {:10.4f}, {:10.4f}, {:10.4f}, {:10.4f}, {:10.4f}".format(abs_rel.mean(),
-                                                                                                  sq_rel.mean(),
-                                                                                                  rms.mean(),
-                                                                                                  log_rms.mean(),
-                                                                                                  d1_all.mean(),
-                                                                                                  a1.mean(), a2.mean(),
-                                                                                                  a3.mean()))
+    # abs_rel : Relative absolute error (percent)
+    # sq_rel  : Relative squared error (percent)
+    # rms     : Root mean squared error of the inverse depth [1/km]
+    # log_rms :
+    # d1_all  :
+    # a1      :
+    # a2      :
+    # a3      :
+
+
+    print("{:>10}, {:>10}, {:>10}, {:>10}, {:>10}, {:>10}, {:>10}, {:>10}".format(
+                                'abs_rel', 'sq_rel', 'rms', 'log_rms', 'd1_all', 'a1', 'a2', 'a3'))
+
+    print("{:10.4f}, {:10.4f}, {:10.4f}, {:10.4f}, {:10.4f}, {:10.4f}, {:10.4f}, {:10.4f}"\
+          .format(abs_rel.mean(), sq_rel.mean(), rms.mean(), log_rms.mean(), d1_all.mean(),
+                  a1.mean(), a2.mean(),a3.mean()))
 
     pass
 
@@ -432,5 +437,5 @@ def evaluate_pose(pred_dir,gtruth_dir):
         ate_all.append(ate)
     ate_all = np.array(ate_all)
     print("Predictions dir: %s" % pred_dir)
-    print("ATE mean: %.4f, std: %.4f" % (np.mean(ate_all), np.std(ate_all)))
+    print("ATE(Absolute Trajectory Error,绝对轨迹误差) mean: %.4f, std: %.4f" % (np.mean(ate_all), np.std(ate_all)))
     pass
