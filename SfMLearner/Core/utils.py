@@ -88,24 +88,28 @@ def euler2mat(z, y, x):
 def pose_vec2mat(vec):
     """
   Converts 6DoF parameters to transformation matrix
+  B for Batch Size
   Args:
       vec: 6DoF parameters in the order of tx, ty, tz, rx, ry, rz -- [B, 6]
   Returns:
       A transformation matrix -- [B, 4, 4]
   """
     batch_size, _ = vec.get_shape().as_list()
-    translation = tf.slice(vec, [0, 0], [-1, 3])
-    translation = tf.expand_dims(translation, -1)
-    rx = tf.slice(vec, [0, 3], [-1, 1])
+    translation = tf.slice(vec, [0, 0], [-1, 3])  # 切出只含有平移的部分,尺寸为[B,3]
+    translation = tf.expand_dims(translation, -1) # 最后加一个维度,[B,4]
+    rx = tf.slice(vec, [0, 3], [-1, 1])  # 从vec里面把rx切下来,[B,1],下同
     ry = tf.slice(vec, [0, 4], [-1, 1])
     rz = tf.slice(vec, [0, 5], [-1, 1])
-    rot_mat = euler2mat(rz, ry, rx)
-    rot_mat = tf.squeeze(rot_mat, axis=[1])
-    filler = tf.constant([0.0, 0.0, 0.0, 1.0], shape=[1, 1, 4])
-    filler = tf.tile(filler, [batch_size, 1, 1])
+    rot_mat = euler2mat(rz, ry, rx)     # 欧拉角转旋转矩阵,z,y,x都是[B,1],一组x,y,z转成一个3x3的旋转矩阵,结果是[B,1,3,3]
+    rot_mat = tf.squeeze(rot_mat, axis=[1])  #删除1位的那个维度,变成[B,3,3]
+    filler = tf.constant([0.0, 0.0, 0.0, 1.0], shape=[1, 1, 4])  # 创建[1,1,4]的变量
+    filler = tf.tile(filler, [batch_size, 1, 1])  # 创建[4,1,4]的变量[[[0. 0. 0. 1.]]
+                                                  #                  [[0. 0. 0. 1.]]
+                                                  #                  [[0. 0. 0. 1.]]
+                                                  #                  [[0. 0. 0. 1.]]]
     transform_mat = tf.concat([rot_mat, translation], axis=2)
-    transform_mat = tf.concat([transform_mat, filler], axis=1)
-    return transform_mat
+    transform_mat = tf.concat([transform_mat, filler], axis=1)  # [B,4,4],最后一行是0,0,0,1,一共4个有效数字
+    return transform_mat #[]
 
 
 def pixel2cam(depth, pixel_coords, intrinsics, is_homogeneous=True):
