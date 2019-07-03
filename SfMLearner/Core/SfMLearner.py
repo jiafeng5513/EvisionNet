@@ -20,7 +20,7 @@ MIN_DISP = 0.01
 flags = tf.app.flags
 flags.DEFINE_integer("run_mode", 2, "0=train,1=test_depth,2=test_pose")
 flags.DEFINE_string("dataset_dir", "/home/RAID1/DataSet/KITTI/KittiOdometry/", "Dataset directory")
-flags.DEFINE_string("checkpoint_dir", "./checkpoints/", "Directory name to save the checkpoints")
+flags.DEFINE_string("checkpoint_dir", "../checkpoints/", "Directory name to save the checkpoints")
 flags.DEFINE_string("init_checkpoint_file", None, "Specific checkpoint file to initialize from")
 flags.DEFINE_float("learning_rate", 0.0002, "Learning rate of for adam")
 flags.DEFINE_float("beta1", 0.9, "Momentum term of adam")
@@ -29,14 +29,14 @@ flags.DEFINE_float("explain_reg_weight", 0.0, "Weight for explanability regulari
 flags.DEFINE_integer("batch_size", 1, "The size of of a sample batch")
 flags.DEFINE_integer("img_height", 128, "Image height")
 flags.DEFINE_integer("img_width", 416, "Image width")
-flags.DEFINE_integer("seq_length", 5, "Sequence length for each example")
+flags.DEFINE_integer("seq_length", 3, "Sequence length for each example")
 flags.DEFINE_integer("max_steps", 200000, "Maximum number of training iterations")
 flags.DEFINE_integer("summary_freq", 100, "Logging every log_freq iterations")
 flags.DEFINE_integer("save_latest_freq", 5000, \
                      "Save the latest model every save_latest_freq iterations (overwrites the previous latest model)")
 flags.DEFINE_boolean("continue_train", False, "Continue training from previous checkpoint")
-flags.DEFINE_string("output_dir", "../test_output/test_pose/", "Output directory")
-flags.DEFINE_string("ckpt_file", "../checkpoints/model-191178", "checkpoint file")
+
+flags.DEFINE_string("ckpt_file", "/home/RAID1/Projects/EvisionNet/SfMLearner/checkpoints/model-150930", "checkpoint file")
 
 # params for model_test_depth
 flags.DEFINE_string("kitti_dir","/home/RAID1/DataSet/KITTI/KittiRaw/",'Path to the KITTI dataset directory')
@@ -46,10 +46,11 @@ flags.DEFINE_float("max_depth",80,"Threshold for maximum depth")
 
 # params for model_test_pose
 flags.DEFINE_integer("test_seq", 9, "Sequence id to test")  # pick from 22 sequences in KittiOdometry
-flags.DEFINE_string("gtruth_dir","../Core/kitti_eval/pose_data/ground_truth/09/",
+flags.DEFINE_string("gtruth_dir","./kitti_eval/pose_data/ground_truth/09/",
                                 'Path to the directory with ground-truth trajectories')
-flags.DEFINE_string("pred_dir","../Core/kitti_eval/pose_data/ours_results/09/",
+flags.DEFINE_string("pred_dir","./test_output/test_pose/",
                                 "Path to the directory with predicted trajectories")
+flags.DEFINE_string("output_dir", "./test_output/test_pose/", "Output directory")
 
 # add by jiafeng5513,followed by https://github.com/tinghuiz/SfMLearner/pull/70
 flags.DEFINE_integer("num_source", None, "number of source images")

@@ -6,5 +6,5 @@
                 --seq_length 3 \
                 --dataset_dir /home/RAID1/DataSet/KITTI/KittiOdometry/ \
                 --output_dir ../test_output/test_pose/ \
-                --ckpt_file ../checkpoints/model-181116
+                --ckpt_file ../checkpoints/model-150930
 # following https://github.com/tinghuiz/SfMLearner/issues/67,update by jiafeng5513
