@@ -9,7 +9,6 @@ import requests
 from depth_evaluation_utils import *
 from glob import glob
 from pose_evaluation_utils import *
-from utils import *
 
 
 def gray2rgb(im, cmap='gray'):
@@ -343,6 +342,9 @@ def download(url, file_path):
                 sys.stdout.write("\r[%s%s] %d%%" % ('█' * done, ' ' * (50 - done), 100 * temp_size / total_size))
                 sys.stdout.flush()
     print()  # 避免上面\r 回车符
+
+
+
 
 
 def evaluate_depth(pred_depths,test_file_list,kitti_dir,min_depth,max_depth):

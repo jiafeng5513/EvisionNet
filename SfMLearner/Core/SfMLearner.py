@@ -639,6 +639,23 @@ def model_test_depth():
 
 
 def model_test_pose():
+    """
+    测试pose
+    1. 根据要测试的sequence_id,读取数据集,找到对应的pose_Groundtruth
+    2. 把原有的12参数变更为8参数,存储成all.txt
+    3. 按照sequence_length,把上述数据存储成一系列文件.
+    4. 连接图片,进入网络进行测试
+    5. 把测试结果存储成一系列文件
+    6. 对比这些文件,得到测试结果
+    :return:
+    """
+    if not os.path.isdir(FLAGS.output_dir):
+        os.makedirs(FLAGS.output_dir)
+
+    pose_gt_file = os.path.join(FLAGS.dataset_dir,'poses','%.2d.txt' % FLAGS.test_seq)
+
+    # 把原有的12参数变更为8参数,存储成all.txt
+
     sfm = SfMLearner()
     sfm.setup_inference(img_height=FLAGS.img_height,
                         img_width=FLAGS.img_width,
@@ -646,15 +663,26 @@ def model_test_pose():
                         seq_length=FLAGS.seq_length)
     saver = tf.train.Saver([var for var in tf.trainable_variables()])
 
-    if not os.path.isdir(FLAGS.output_dir):
-        os.makedirs(FLAGS.output_dir)
+
     seq_dir = os.path.join(FLAGS.dataset_dir, 'sequences', '%.2d' % FLAGS.test_seq)
     img_dir = os.path.join(seq_dir, 'image_2')
     N = len(glob(img_dir + '/*.png'))
-    test_frames = ['%.2d %.6d' % (FLAGS.test_seq, n) for n in range(N)]
+    test_frames = ['%.2d %.6d' % (FLAGS.test_seq, n) for n in range(N)]  # 000000~N
+
     with open(FLAGS.dataset_dir + 'sequences/%.2d/times.txt' % FLAGS.test_seq, 'r') as f:
         times = f.readlines()
+
     times = np.array([float(s[:-1]) for s in times])
+    output_file_name = FLAGS.output_dir +'/%.2d' % FLAGS.test_seq+"_pose_gt_all.txt"
+
+    Odometry_12params_to_8params(pose_gt_file, times, output_file_name)
+    groundTruthPath = FLAGS.output_dir+"/GroundTruth/"
+    if not os.path.isdir(groundTruthPath):
+        os.makedirs(groundTruthPath)
+
+    create_8params_gtfiles(output_file_name, groundTruthPath, FLAGS.seq_length)
+
+
     max_src_offset = (FLAGS.seq_length - 1) // 2
     with tf.Session() as sess:
         saver.restore(sess, FLAGS.ckpt_file)
@@ -675,9 +703,15 @@ def model_test_pose():
             # Insert the target pose [0, 0, 0, 0, 0, 0]
             pred_poses = np.insert(pred_poses, max_src_offset, np.zeros((1, 6)), axis=0)
             curr_times = times[tgt_idx - max_src_offset:tgt_idx + max_src_offset + 1]
-            out_file = FLAGS.output_dir + '%.6d.txt' % (tgt_idx - max_src_offset)
+
+            predictionPath = FLAGS.output_dir + "/Prediction/"
+            if not os.path.isdir(predictionPath):
+                os.makedirs(predictionPath)
+
+            out_file = predictionPath + '/%.6d.txt' % (tgt_idx - max_src_offset)
+
             dump_pose_seq_TUM(out_file, pred_poses, curr_times)
-    evaluate_pose(FLAGS.pred_dir, FLAGS.gtruth_dir)
+    evaluate_pose(predictionPath, groundTruthPath)
     pass
 
 

@@ -381,3 +381,35 @@ def dump_pose_seq_TUM(out_file, poses, times):
             rot = this_pose[:3, :3]
             qw, qx, qy, qz = rot2quat(rot)
             f.write('%f %f %f %f %f %f %f %f\n' % (times[p], tx, ty, tz, qx, qy, qz, qw))
+
+
+def Odometry_12params_to_8params(input_file_name, times, output_file_name):
+    with open(input_file_name, 'r') as f_in:
+        Odometry_12params_lines = f_in.readlines()
+        with open(output_file_name, 'w') as f_out:
+            for i in range(len(Odometry_12params_lines)):
+                line = Odometry_12params_lines[i]
+                params_12_array = np.array([float(s) for s in line.split()])
+                params_12_mat = params_12_array.reshape(3, 4)
+
+                time = times[i]
+                tx = params_12_mat[0, 3]
+                ty = params_12_mat[1, 3]
+                tz = params_12_mat[2, 3]
+                rot = params_12_mat[:3, :3]
+
+                qw, qx, qy, qz = rot2quat(rot)
+                f_out.write('%f %f %f %f %f %f %f %f\n' % (time, tx, ty, tz, qx, qy, qz, qw))
+    pass
+
+
+def create_8params_gtfiles(input_file_name,output_file_path,seq_length):
+    with open(input_file_name, 'r') as f_in:
+        full_file_lines = f_in.readlines()
+        full_lines = np.array([s for s in full_file_lines])
+
+        for i in range(len(full_file_lines)-seq_length):
+            with open(output_file_path+ '/%.6d.txt' %i, 'w') as f_out:
+                for j in range(seq_length):
+                    f_out.writelines(full_lines[i+j])
+    pass
