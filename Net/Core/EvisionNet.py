@@ -106,12 +106,12 @@ def pose_exp_net(tgt_image, src_image_stack, do_exp=True, is_training=True):
     W = inputs.get_shape()[2].value
     num_source = int(src_image_stack.get_shape()[3].value // 3)
     with tf.variable_scope('pose_exp_net') as sc:
-        #end_points_collection = sc.original_name_scope + '_end_points'
+        end_points_collection = sc.original_name_scope + '_end_points'
         with slim.arg_scope([slim.conv2d, slim.conv2d_transpose],
                             normalizer_fn=None,
                             weights_regularizer=slim.l2_regularizer(0.05),
                             activation_fn=tf.nn.relu,
-                            outputs_collections=None):
+                            outputs_collections=end_points_collection):
             # cnv1 to cnv5b are shared between pose and explainability prediction
             cnv1 = slim.conv2d(inputs, 16, [7, 7], stride=2, scope='cnv1')
             cnv2 = slim.conv2d(cnv1, 32, [5, 5], stride=2, scope='cnv2')
@@ -153,8 +153,8 @@ def pose_exp_net(tgt_image, src_image_stack, do_exp=True, is_training=True):
                 mask2 = None
                 mask3 = None
                 mask4 = None
-            #end_points = utils.convert_collection_to_dict(end_points_collection)
-            return pose_final, [mask1, mask2, mask3, mask4]  #, end_points
+            end_points = utils.convert_collection_to_dict(end_points_collection)
+            return pose_final, [mask1, mask2, mask3, mask4], end_points
 
 
 def disp_net(tgt_image, is_training=True):
@@ -283,7 +283,7 @@ class EvisionNet(object):
             pred_depth = [1./d for d in pred_disp]
 
         with tf.name_scope("pose_and_explainability_prediction"):  # , pose_exp_net_endpoints
-            pred_poses, pred_exp_logits = pose_exp_net(tgt_image,src_image_stack,
+            pred_poses, pred_exp_logits, pose_exp_net_endpoints = pose_exp_net(tgt_image,src_image_stack,
                                                         do_exp=(opt.explain_reg_weight > 0),
                                                         is_training=True)
 
@@ -531,7 +531,7 @@ class EvisionNet(object):
         tgt_image, src_image_stack = loader.batch_unpack_image_sequence(
                 input_mc, self.img_height, self.img_width, self.num_source)
         with tf.name_scope("pose_prediction"):
-            pred_poses, _= pose_exp_net(tgt_image, src_image_stack, do_exp=False, is_training=False)
+            pred_poses, _, _ = pose_exp_net(tgt_image, src_image_stack, do_exp=False, is_training=False)
             self.inputs = input_uint8
             self.pred_poses = pred_poses
 
@@ -721,12 +721,18 @@ def model_test_pose():
 
 
 def main(_):
+    start_time = time.time()
     if FLAGS.run_mode == 0:
         model_train_all()
     elif FLAGS.run_mode == 1:
         model_test_depth()
     elif FLAGS.run_mode == 2:
         model_test_pose()
+    time_elapsed = time.time() - start_time
+    h = time_elapsed // 3600
+    m = (time_elapsed - 3600*h) // 60
+    s = time_elapsed - 3600*h - m*60
+    print('Complete in {:.0f}h {:.0f}m {:.0f}s'.format(h,m,s))
     pass
 
 
