@@ -49,10 +49,6 @@ flags.DEFINE_float("max_depth",80,"Threshold for maximum depth")
 
 # params for model_test_pose
 flags.DEFINE_integer("test_seq", 9, "使用KittiOdometry的哪个序列进行测试")  # pick from 22 sequences in KittiOdometry
-flags.DEFINE_string("gtruth_dir","./kitti_eval/pose_data/ground_truth/09/",
-                                'Path to the directory with ground-truth trajectories')
-flags.DEFINE_string("pred_dir","./test_output/test_pose/",
-                                "Path to the directory with predicted trajectories")
 flags.DEFINE_string("output_dir", "./test_output/test_pose/", "Output directory")
 
 # add by jiafeng5513,followed by https://github.com/tinghuiz/SfMLearner/pull/70
