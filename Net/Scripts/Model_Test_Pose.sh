@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-/usr/local/anaconda3/bin/python3 ../Core/SfMLearner.py \
+/usr/local/anaconda3/bin/python3 ../Core/EvisionNet.py \
                 --run_mode 2 \
                 --test_seq 9 \
                 --batch_size 1 \

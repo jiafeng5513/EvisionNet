@@ -21,8 +21,11 @@ flags = tf.app.flags
 flags.DEFINE_integer("run_mode", 2, "0=train,1=test_depth,2=test_pose")
 
 flags.DEFINE_string("dataset_dir", "/home/RAID1/DataSet/KITTI/KittiOdometry/", "数据位置")
-flags.DEFINE_string("kitti_dir","/home/RAID1/DataSet/KITTI/KittiRaw/",'Path to the KITTI dataset directory')
 # KittiOdometry,KittiOdometry_prepared,KittiRaw,KittiRaw_prepared
+
+# test pose  : KittiOdometry
+# test depth : KittiRaw
+# train      : KittiRaw_prepared
 
 flags.DEFINE_string("checkpoint_dir", "../checkpoints/", "用于保存和加载ckpt的目录")
 
@@ -42,7 +45,6 @@ flags.DEFINE_integer("save_latest_freq", 5000,"保存最新模型的频率(会�
 flags.DEFINE_boolean("continue_train", False, "是否从之前的ckpt继续训练")
 
 # params for model_test_depth
-
 flags.DEFINE_string("test_file_list",'../data/kitti/test_files_eigen.txt',"Path to the list of test files")
 flags.DEFINE_float("min_depth",1e-3,"Threshold for minimum depth")
 flags.DEFINE_float("max_depth",80,"Threshold for maximum depth")
@@ -259,7 +261,7 @@ def is_valid_sample(frames, tgt_idx, seq_length):
     return False
 
 
-class SfMLearner(object):
+class EvisionNet(object):
     def __init__(self):
         pass
     
@@ -588,7 +590,7 @@ def model_train_all():
     if not os.path.exists(FLAGS.checkpoint_dir):
         os.makedirs(FLAGS.checkpoint_dir)
 
-    sfm = SfMLearner()
+    sfm = EvisionNet()
     sfm.train(FLAGS)
 
 
@@ -599,7 +601,7 @@ def model_test_depth():
         test_files = f.readlines()
         test_files = [FLAGS.dataset_dir + t[:-1] for t in test_files]
     basename = os.path.basename(ckpt_name)
-    sfm = SfMLearner()
+    sfm = EvisionNet()
     sfm.setup_inference(img_height=FLAGS.img_height,
                         img_width=FLAGS.img_width,
                         batch_size=FLAGS.batch_size,
@@ -633,7 +635,7 @@ def model_test_depth():
                     break
                 pred_all.append(pred['depth'][b, :, :, 0])
         evaluate_depth(pred_all,FLAGS.test_file_list,
-                                FLAGS.kitti_dir,
+                                FLAGS.dataset_dir,
                                 FLAGS.min_depth,
                                 FLAGS.max_depth)
     pass
@@ -657,7 +659,7 @@ def model_test_pose():
 
     # 把原有的12参数变更为8参数,存储成all.txt
 
-    sfm = SfMLearner()
+    sfm = EvisionNet()
     sfm.setup_inference(img_height=FLAGS.img_height,
                         img_width=FLAGS.img_width,
                         mode='pose',
