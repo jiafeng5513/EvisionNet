@@ -804,3 +804,5 @@ local.properties
 
 !/SfMLearner/Scripts/
 !*.sh
+/SfMLearner/Core/test_output/
+SfMLearner/Core/test_output/

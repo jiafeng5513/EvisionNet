@@ -344,7 +344,22 @@ def download(url, file_path):
     print()  # 避免上面\r 回车符
 
 
-
+def find_latest_ckpt(ckpt_path):
+    '''
+    查找ckpt_path目录下面最新的ckpt,
+    如果存在latest,则返回model.latest.否则返回最新新的model-XXX
+    :param ckpt_path:
+    :return:
+    '''
+    dict_meta = {}
+    for file in os.listdir(ckpt_path):
+        if os.path.splitext(file)[1] == '.meta':
+            prefix = os.path.splitext(file)[0]
+            if prefix =='model.latest':
+                return prefix
+            else:
+                dict_meta[prefix.split('-')[1]]=prefix
+    return dict_meta[max(dict_meta, key=dict_meta.get)]
 
 
 def evaluate_depth(pred_depths,test_file_list,kitti_dir,min_depth,max_depth):
@@ -451,3 +466,4 @@ def evaluate_pose(pred_dir,gtruth_dir):
     print("Predictions dir: %s" % pred_dir)
     print("ATE(Absolute Trajectory Error,绝对轨迹误差) mean: %.4f, std: %.4f" % (np.mean(ate_all), np.std(ate_all)))
     pass
+

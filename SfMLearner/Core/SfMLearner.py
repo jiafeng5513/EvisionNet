@@ -19,33 +19,37 @@ MIN_DISP = 0.01
 
 flags = tf.app.flags
 flags.DEFINE_integer("run_mode", 2, "0=train,1=test_depth,2=test_pose")
-flags.DEFINE_string("dataset_dir", "/home/RAID1/DataSet/KITTI/KittiOdometry/", "Dataset directory")
-flags.DEFINE_string("checkpoint_dir", "../checkpoints/", "Directory name to save the checkpoints")
-flags.DEFINE_string("init_checkpoint_file", None, "Specific checkpoint file to initialize from")
-flags.DEFINE_float("learning_rate", 0.0002, "Learning rate of for adam")
-flags.DEFINE_float("beta1", 0.9, "Momentum term of adam")
-flags.DEFINE_float("smooth_weight", 0.5, "Weight for smoothness")
-flags.DEFINE_float("explain_reg_weight", 0.0, "Weight for explanability regularization")
-flags.DEFINE_integer("batch_size", 1, "The size of of a sample batch")
-flags.DEFINE_integer("img_height", 128, "Image height")
-flags.DEFINE_integer("img_width", 416, "Image width")
-flags.DEFINE_integer("seq_length", 3, "Sequence length for each example")
-flags.DEFINE_integer("max_steps", 200000, "Maximum number of training iterations")
-flags.DEFINE_integer("summary_freq", 100, "Logging every log_freq iterations")
-flags.DEFINE_integer("save_latest_freq", 5000, \
-                     "Save the latest model every save_latest_freq iterations (overwrites the previous latest model)")
-flags.DEFINE_boolean("continue_train", False, "Continue training from previous checkpoint")
 
+flags.DEFINE_string("dataset_dir", "/home/RAID1/DataSet/KITTI/KittiOdometry/", "数据位置")
+flags.DEFINE_string("kitti_dir","/home/RAID1/DataSet/KITTI/KittiRaw/",'Path to the KITTI dataset directory')
+# KittiOdometry,KittiOdometry_prepared,KittiRaw,KittiRaw_prepared
+
+flags.DEFINE_string("checkpoint_dir", "../checkpoints/", "用于保存和加载ckpt的目录")
 flags.DEFINE_string("ckpt_file", "/home/RAID1/Projects/EvisionNet/SfMLearner/checkpoints/model-150930", "checkpoint file")
 
+# params for model_train
+flags.DEFINE_string("init_checkpoint_file", None, "用来初始化的ckpt")
+flags.DEFINE_float("learning_rate", 0.0002, "学习率")
+flags.DEFINE_float("beta1", 0.9, "adam动量参数")
+flags.DEFINE_float("smooth_weight", 0.5, "平滑的权重")
+flags.DEFINE_float("explain_reg_weight", 0.0, "Weight for explanability regularization")
+flags.DEFINE_integer("batch_size", 1, "batch size")
+flags.DEFINE_integer("img_height", 128, "Image height")
+flags.DEFINE_integer("img_width", 416, "Image width")
+flags.DEFINE_integer("seq_length", 3, "一个样本中含有几张图片")
+flags.DEFINE_integer("max_steps", 200000, "训练迭代次数")
+flags.DEFINE_integer("summary_freq", 100, "summary频率")
+flags.DEFINE_integer("save_latest_freq", 5000,"保存最新模型的频率(会覆盖之前保存的最新模型)")
+flags.DEFINE_boolean("continue_train", False, "是否从之前的ckpt继续训练")
+
 # params for model_test_depth
-flags.DEFINE_string("kitti_dir","/home/RAID1/DataSet/KITTI/KittiRaw/",'Path to the KITTI dataset directory')
+
 flags.DEFINE_string("test_file_list",'../data/kitti/test_files_eigen.txt',"Path to the list of test files")
 flags.DEFINE_float("min_depth",1e-3,"Threshold for minimum depth")
 flags.DEFINE_float("max_depth",80,"Threshold for maximum depth")
 
 # params for model_test_pose
-flags.DEFINE_integer("test_seq", 9, "Sequence id to test")  # pick from 22 sequences in KittiOdometry
+flags.DEFINE_integer("test_seq", 9, "使用KittiOdometry的哪个序列进行测试")  # pick from 22 sequences in KittiOdometry
 flags.DEFINE_string("gtruth_dir","./kitti_eval/pose_data/ground_truth/09/",
                                 'Path to the directory with ground-truth trajectories')
 flags.DEFINE_string("pred_dir","./test_output/test_pose/",
@@ -594,10 +598,12 @@ def model_train_all():
 
 
 def model_test_depth():
+    ckpt_name = find_latest_ckpt(FLAGS.checkpoint_dir)
+    ckpt_abs_file_path = os.path.join(FLAGS.checkpoint_dir,ckpt_name)
     with open(FLAGS.test_file_list, 'r') as f:
         test_files = f.readlines()
         test_files = [FLAGS.dataset_dir + t[:-1] for t in test_files]
-    basename = os.path.basename(FLAGS.ckpt_file)
+    basename = os.path.basename(ckpt_name)
     sfm = SfMLearner()
     sfm.setup_inference(img_height=FLAGS.img_height,
                         img_width=FLAGS.img_width,
@@ -607,7 +613,7 @@ def model_test_depth():
     config = tf.ConfigProto()
     config.gpu_options.allow_growth = True
     with tf.Session(config=config) as sess:
-        saver.restore(sess, FLAGS.ckpt_file)
+        saver.restore(sess, ckpt_abs_file_path)
         pred_all = []
         for t in range(0, len(test_files), FLAGS.batch_size):
             if t % 100 == 0:
