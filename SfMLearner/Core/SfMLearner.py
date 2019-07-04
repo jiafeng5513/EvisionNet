@@ -25,7 +25,6 @@ flags.DEFINE_string("kitti_dir","/home/RAID1/DataSet/KITTI/KittiRaw/",'Path to t
 # KittiOdometry,KittiOdometry_prepared,KittiRaw,KittiRaw_prepared
 
 flags.DEFINE_string("checkpoint_dir", "../checkpoints/", "用于保存和加载ckpt的目录")
-flags.DEFINE_string("ckpt_file", "/home/RAID1/Projects/EvisionNet/SfMLearner/checkpoints/model-150930", "checkpoint file")
 
 # params for model_train
 flags.DEFINE_string("init_checkpoint_file", None, "用来初始化的ckpt")
@@ -690,8 +689,10 @@ def model_test_pose():
 
 
     max_src_offset = (FLAGS.seq_length - 1) // 2
+    ckpt_name = find_latest_ckpt(FLAGS.checkpoint_dir)
+    ckpt_abs_file_path = os.path.join(FLAGS.checkpoint_dir,ckpt_name)
     with tf.Session() as sess:
-        saver.restore(sess, FLAGS.ckpt_file)
+        saver.restore(sess, ckpt_abs_file_path)
         for tgt_idx in range(N):
             if not is_valid_sample(test_frames, tgt_idx, FLAGS.seq_length):
                 continue
