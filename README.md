@@ -13,7 +13,7 @@ EvisonNet
 * Windows10 or Ubuntu 18.04
 * Python3.6 or 3.7,Anaconda3
 * CUDA10+cudnn7.5
-* Pytorch
+* tensorflow 1.13.1
 ### 3. 参考文献<br>
 [1]. (双目视差)Chang, Jia-Ren, and Yong-Sheng Chen. "Pyramid stereo matching network." Proceedings of the IEEE Conference on Computer Vision and Pattern Recognition. 2018.[PSMNet](https://github.com/JiaRenChang/PSMNet).<br>
 [2]. (特征点匹配并应用于三维重建)Moo Yi K, Verdie Y, Fua P, et al. "Learning to assign orientations to feature points." Proceedings of the IEEE Conference on Computer Vision and Pattern Recognition. 2016: 107-116.[Code](https://github.com/vcg-uvic/benchmark-orientation).<br>
@@ -29,6 +29,8 @@ EvisonNet
 ### 4. 参考项目
 [1]. [EdgeConnect](https://github.com/knazeri/edge-connect).<br>
 [2]. [Cycled-GAN](https://github.com/andrea-pilzer/unsup-stereo-depthGAN/).<br>
+[3]. [SfMLearner](https://github.com/tinghuiz/SfMLearner).<br>
+[4]. [SfmLearner-Pytorch](https://github.com/ClementPinard/SfmLearner-Pytorch).<br>
 ### 5. 其他网址
 [1]. [middlebury 数据集](http://vision.middlebury.edu/stereo/).<br>
 [2]. [KITTI 数据集](http://www.cvlibs.net/datasets/kitti/).<br>

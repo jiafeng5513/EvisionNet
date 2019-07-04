@@ -796,13 +796,36 @@ local.properties
 
 *.tar
 *.npy
-/SfMLearner/checkpoints/
-/SfMLearner/test_output/
-/SfMLearner/Core/kitti_eval/pose_data/
-/SfMLearner/models/depth_model
-/SfMLearner/models/pose_model
+/Net/checkpoints/
+/Net/test_output/
+/Net/Core/kitti_eval/pose_data/
+/Net/models/depth_model
+/Net/models/pose_model
 
-!/SfMLearner/Scripts/
+!/Net/Scripts/
 !*.sh
-/SfMLearner/Core/test_output/
-SfMLearner/Core/test_output/
+/Net/Core/test_output/
+Net/Core/test_output/
+将删除 Net/checkpoints/checkpoint
+将删除 Net/checkpoints/events.out.tfevents.1562160262.GpuServer
+将删除 Net/checkpoints/graph.pbtxt
+将删除 Net/checkpoints/model-110682.data-00000-of-00001
+将删除 Net/checkpoints/model-110682.index
+将删除 Net/checkpoints/model-120744.data-00000-of-00001
+将删除 Net/checkpoints/model-120744.index
+将删除 Net/checkpoints/model-130806.data-00000-of-00001
+将删除 Net/checkpoints/model-130806.index
+将删除 Net/checkpoints/model-140868.data-00000-of-00001
+将删除 Net/checkpoints/model-140868.index
+将删除 Net/checkpoints/model-150930.data-00000-of-00001
+将删除 Net/checkpoints/model-150930.index
+将删除 Net/checkpoints/model-160992.data-00000-of-00001
+将删除 Net/checkpoints/model-160992.index
+将删除 Net/checkpoints/model-171054.data-00000-of-00001
+将删除 Net/checkpoints/model-171054.index
+将删除 Net/checkpoints/model-181116.data-00000-of-00001
+将删除 Net/checkpoints/model-181116.index
+将删除 Net/checkpoints/model-191178.data-00000-of-00001
+将删除 Net/checkpoints/model-191178.index
+将删除 Net/checkpoints/model.latest.data-00000-of-00001
+将删除 Net/checkpoints/model.latest.index
