@@ -14,6 +14,7 @@ from glob import glob
 from data_loader import DataLoader
 from utils import *
 import re
+from datetime import datetime
 
 # Range of disparity/inverse depth values
 DISP_SCALING = 10
@@ -46,6 +47,7 @@ flags.DEFINE_integer("max_steps", 200000, "训练迭代次数")
 flags.DEFINE_integer("summary_freq", 100, "summary频率")
 flags.DEFINE_integer("save_latest_freq", 5000, "保存最新模型的频率(会覆盖之前保存的最新模型)")
 flags.DEFINE_boolean("continue_train", False, "是否从之前的ckpt继续训练")
+flags.DEFINE_integer('num_gpus', 4, "使用多少GPU")
 
 # params for model_test_depth
 flags.DEFINE_string("test_file_list", '../data/kitti/test_files_eigen.txt', "Path to the list of test files")
@@ -69,6 +71,12 @@ def resize_like(inputs, ref):
     if iH == rH and iW == rW:
         return inputs
     return tf.image.resize_nearest_neighbor(inputs, [rH.value, rW.value])
+
+
+def preprocess_image(image):
+    # Assuming input image is uint8
+    image = tf.image.convert_image_dtype(image, dtype=tf.float32)
+    return image * 2. - 1.
 
 
 def _activation_summary(x):
@@ -160,8 +168,9 @@ def _conv2d_transpose(input_data, out_channels, filter_height, filter_width, str
         biases = _variable_on_cpu('biases', [out_channels], tf.constant_initializer(0.0))
 
         transpose_conv = tf.nn.conv2d_transpose(value=input_data, filter=kernel,
-                         output_shape=[1,input_data.get_shape()[1]*2,input_data.get_shape()[2]*2,out_channels],
-                                                strides=[1, stride, stride,1], padding='SAME')
+                                                output_shape=[1, input_data.get_shape()[1] * 2,
+                                                              input_data.get_shape()[2] * 2, out_channels],
+                                                strides=[1, stride, stride, 1], padding='SAME')
 
         pre_activation = tf.nn.bias_add(transpose_conv, biases)
 
@@ -262,7 +271,7 @@ def disp_net(tgt_image, is_training=True):
         upcnv2 = _conv2d_transpose(icnv3, 32, 3, 3, 2, 'upcnv2')
         i2_in = tf.concat([upcnv2, cnv1b, disp3_up], axis=3)
         icnv2 = _conv2d_with_relu(i2_in, 32, 3, 3, 1, 'icnv2')
-        disp2 = DISP_SCALING * _conv2d_with_sigmoid(icnv2, 1, 3, 3, 1,'disp2') + MIN_DISP
+        disp2 = DISP_SCALING * _conv2d_with_sigmoid(icnv2, 1, 3, 3, 1, 'disp2') + MIN_DISP
         disp2_up = tf.image.resize_bilinear(disp2, [H, W])
 
         upcnv1 = _conv2d_transpose(icnv2, 16, 3, 3, 2, 'upcnv1')
@@ -308,7 +317,7 @@ def is_valid_sample(frames, tgt_idx, seq_length):
 def get_reference_explain_mask(downscaling):
     tmp = np.array([0, 1])
     ref_exp_mask = np.tile(tmp, (FLAGS.batch_size, int(FLAGS.img_height / (2 ** downscaling)),
-                                                int(FLAGS.img_width / (2 ** downscaling)), 1))
+                                 int(FLAGS.img_width / (2 ** downscaling)), 1))
     ref_exp_mask = tf.constant(ref_exp_mask, dtype=tf.float32)
     return ref_exp_mask
 
@@ -363,7 +372,8 @@ def loss(tgt_image, src_image_stack, intrinsics, pred_disp, pred_poses, pred_exp
                 ref_exp_mask = get_reference_explain_mask(s)
             # Scale the source and target images for computing loss at the
             # according scale.
-            curr_tgt_image = tf.image.resize_area(tgt_image, [int(FLAGS.img_height / (2 ** s)), int(FLAGS.img_width / (2 ** s))])
+            curr_tgt_image = tf.image.resize_area(tgt_image,
+                                                  [int(FLAGS.img_height / (2 ** s)), int(FLAGS.img_width / (2 ** s))])
             curr_src_image_stack = tf.image.resize_area(src_image_stack,
                                                         [int(FLAGS.img_height / (2 ** s)),
                                                          int(FLAGS.img_width / (2 ** s))])
@@ -416,9 +426,6 @@ def loss(tgt_image, src_image_stack, intrinsics, pred_disp, pred_poses, pred_exp
 
         return total_loss
 
-
-
-
     # # 计算batch的平均交叉熵损失
     # labels = tf.cast(labels, tf.int64)
     # cross_entropy = tf.nn.sparse_softmax_cross_entropy_with_logits(labels=labels, logits=logits,
@@ -431,33 +438,36 @@ def loss(tgt_image, src_image_stack, intrinsics, pred_disp, pred_poses, pred_exp
     # return tf.add_n(tf.get_collection('losses'), name='total_loss')
 
 
-def tower_loss(scope):
+def tower_loss(loader, scope):
     """计算单卡上的损失值
     Args:
       scope: 指定显卡的唯一标识前缀, e.g. 'tower_0'
     Returns:
        Tensor of shape [] containing the total loss for a batch of data
     """
-    # 输入图像和标签
-    images, labels = inputs(train=True, batch_size=FLAGS.batch_size, num_epochs=FLAGS.num_epochs)
+    # 输入
+    with tf.name_scope("data_loading"):
+        tgt_image, src_image_stack, intrinsics = loader.load_train_batch()
+        tgt_image = preprocess_image(tgt_image)
+        src_image_stack = preprocess_image(src_image_stack)
+
     # 过网络
-    logits = inference(images)
 
+    with tf.name_scope("depth_prediction"):
+        pred_disp = disp_net(tgt_image, is_training=True)
 
+    with tf.name_scope("pose_and_explainability_prediction"):
+        pred_poses, pred_exp_logits = pose_exp_net(tgt_image, src_image_stack,
+                                                   do_exp=(FLAGS.explain_reg_weight > 0), is_training=True)
 
     # 损失计算
-    _ = loss(logits, labels)
 
-    # 收集当前显卡的损失
-    losses = tf.get_collection('losses', scope)
-
-    # 计算当前显卡的总损失
-    total_loss = tf.add_n(losses, name='total_loss')
+    total_loss = loss(tgt_image, src_image_stack, intrinsics, pred_disp, pred_poses, pred_exp_logits)
 
     # Attach a scalar summary to all individual losses and the total loss; do
     # the same for the averaged version of the losses.
     if FLAGS.tb_logging:
-        for l in losses + [total_loss]:
+        for l in [total_loss]:
             # Remove 'tower_[0-9]/' from the name in case this is a multi-GPU
             # training session. This helps the clarity of presentation on
             # tensorboard.
@@ -465,6 +475,173 @@ def tower_loss(scope):
             tf.summary.scalar(loss_name, l)
 
     return total_loss
+
+
+def average_gradients(tower_grads):
+    """计算在各个GPU中共享的变量的平均梯度,这是程序的同步点
+        Args:
+          tower_grads: List of lists of (gradient, variable) tuples. The outer list
+            is over individual gradients. The inner list is over the gradient
+            calculation for each tower.
+        Returns:
+           List of pairs of (gradient, variable) where the gradient has been
+           averaged across all towers.
+        """
+    average_grads = []
+    for grad_and_vars in zip(*tower_grads):
+        # Note that each grad_and_vars looks like the following:
+        #   ((grad0_gpu0, var0_gpu0), ... , (grad0_gpuN, var0_gpuN))
+        grads = []
+        for g, _ in grad_and_vars:
+            # Add 0 dimension to the gradients to represent the tower.
+            expanded_g = tf.expand_dims(g, 0)
+
+            # Append on a 'tower' dimension which we will average over below.
+            grads.append(expanded_g)
+
+        # Average over the 'tower' dimension.
+        grad = tf.concat(grads, 0)
+        grad = tf.reduce_mean(grad, 0)
+
+        # Keep in mind that the Variables are redundant because they are shared
+        # across towers. So .. we will just return the first tower's pointer to
+        # the Variable.
+        v = grad_and_vars[0][1]
+        grad_and_var = (grad, v)
+        average_grads.append(grad_and_var)
+    return average_grads
+
+
+def train():
+    with tf.Graph().as_default(), tf.device('/cpu:0'):
+        # 训练次数的计数变量,train()每被调用一次就+1,global_step = batches processed * FLAGS.num_gpus
+        global_step = tf.get_variable('global_step', [], initializer=tf.constant_initializer(0), trainable=False)
+
+        # 学习率
+        # num_batches_per_epoch = (NUM_EXAMPLES_PER_EPOCH_FOR_TRAIN / FLAGS.batch_size)
+        # decay_steps = int(num_batches_per_epoch * NUM_EPOCHS_PER_DECAY)
+        # # Decay the learning rate exponentially based on the number of steps.
+        # lr = tf.train.exponential_decay(INITIAL_LEARNING_RATE,
+        #                                 global_step,
+        #                                 decay_steps,
+        #                                 LEARNING_RATE_DECAY_FACTOR,
+        #                                 staircase=True)
+        # 使用动量优化器,目前是固定学习率,TODO:策略学习率
+        #opt = tf.train.MomentumOptimizer(lr, 0.9, use_nesterov=True, use_locking=True)
+        opt = tf.train.AdamOptimizer(FLAGS.learning_rate, FLAGS.beta1, use_locking=True)
+
+        loader = DataLoader(FLAGS.dataset_dir, FLAGS.batch_size, FLAGS.img_height, FLAGS.img_width,
+                            FLAGS.num_source, FLAGS.num_scales)
+        # 每个GPU分别计算梯度
+        tower_grads = []
+        with tf.variable_scope(tf.get_variable_scope()):
+            for i in range(FLAGS.num_gpus):
+                with tf.device('/gpu:%d' % i):
+                    with tf.name_scope('%s_%d' % (TOWER_NAME, i)) as scope:
+                        # Calculate the loss for one tower of the CIFAR model.
+                        # This function constructs the entire CIFAR model but
+                        # shares the variables across all towers.
+                        _loss = tower_loss(loader, scope)  # 计算损失,注意,数据的加载,预测值,损失计算都包含在其中
+                        # Reuse variables for the next tower.
+                        tf.get_variable_scope().reuse_variables()
+                        # Retain the summaries from the final tower.
+                        summaries = tf.get_collection(tf.GraphKeys.SUMMARIES, scope)
+                        # 计算此批数据的梯度
+                        grads = opt.compute_gradients(_loss, gate_gradients=0)
+                        # 跟踪所有卡的梯度。
+                        tower_grads.append(grads)
+
+        # 所有卡梯度求均值(多卡同步点)
+        grads = average_gradients(tower_grads)
+
+        # 梯度变化图
+        if FLAGS.tb_logging:
+            for grad, var in grads:
+                if grad is not None:
+                    summaries.append(
+                        tf.summary.histogram(var.op.name + '/gradients', grad))
+            # Add a summary to track the learning rate.
+            summaries.append(tf.summary.scalar('learning_rate', FLAGS.learning_rate))  # 目前使用的是固定学习率 TODO:策略学习率
+
+        # 应用梯度
+        train_op = opt.apply_gradients(grads, global_step=global_step)
+
+        # 可训练变量的曲线图
+        if FLAGS.tb_logging:
+            for var in tf.trainable_variables():
+                summaries.append(tf.summary.histogram(var.op.name, var))
+
+        # Create a saver.
+        saver = tf.train.Saver(tf.global_variables(), sharded=True)
+
+        # Build the summary operation from the last tower summaries.
+        summary_op = tf.summary.merge(summaries)
+
+        # Build an initialization operation to run below.
+        # init = tf.global_variables_initializer()
+
+        # The op for initializing the variables.
+        init_op = tf.group(tf.global_variables_initializer(), tf.local_variables_initializer())
+
+        # Start running operations on the Graph. allow_soft_placement must be
+        # set to True to build towers on GPU, as some of the ops do not have GPU
+        # implementations.
+        sess = tf.Session(config=tf.ConfigProto(
+            allow_soft_placement=True,
+            log_device_placement=FLAGS.log_device_placement))
+        sess.run(init_op)
+
+        # Start input enqueue threads.
+        coord = tf.train.Coordinator()
+        threads = tf.train.start_queue_runners(sess=sess, coord=coord)
+
+        summary_writer = tf.summary.FileWriter(FLAGS.train_dir, sess.graph)
+
+        try:
+            step = 0
+            saver = tf.train.Saver([var for var in tf.model_variables()] + [global_step],max_to_keep=10)
+            while not coord.should_stop():
+                start_time = time.time()
+
+                # 一步训练
+                _, loss_value = sess.run([train_op, _loss])
+                # 计算用时
+                duration = time.time() - start_time
+
+                assert not np.isnan(loss_value), 'Model diverged with loss = NaN'
+
+                # TensorBoard
+                if step % 10 == 0:
+                    summary_str = sess.run(summary_op)
+                    summary_writer.add_summary(summary_str, step)
+                # 终端输出
+                if step % 100 == 0:
+                    num_examples_per_step = FLAGS.batch_size * FLAGS.num_gpus
+                    examples_per_sec = num_examples_per_step / duration
+                    sec_per_batch = duration / FLAGS.num_gpus
+                    format_str = '%s: step %d, loss = %.2f (%.1f examples/sec; %.3f sec/batch)'
+                    print(format_str % (datetime.now(), step, loss_value, examples_per_sec, sec_per_batch))
+                # 模型保存
+                if step % 1000 == 0 or (step + 1) == FLAGS.num_epochs * FLAGS.batch_size:
+                    print(" [*] Saving checkpoint to %s..." % FLAGS.checkpoint_dir)
+                    saver.save(sess, os.path.join(FLAGS.checkpoint_dir, 'model'), global_step=step)
+                if step % FLAGS.save_latest_freq == 0:
+                    print(" [*] Saving checkpoint to %s..." % FLAGS.checkpoint_dir)
+                    saver.save(sess, os.path.join(FLAGS.checkpoint_dir, 'model.latest'))
+                step += 1
+
+        except tf.errors.OutOfRangeError:
+            print('Done training for %d epochs, %d steps.' % (
+                FLAGS.num_epochs, step))
+        finally:
+            # When done, ask the threads to stop.
+            coord.request_stop()
+
+        # Wait for threads to finish.
+        coord.join(threads)
+        sess.close()
+    pass
+
 
 class EvisionNet(object):
     def __init__(self):
@@ -489,7 +666,7 @@ class EvisionNet(object):
 
         with tf.name_scope("pose_and_explainability_prediction"):  # , pose_exp_net_endpoints
             pred_poses, pred_exp_logits = pose_exp_net(tgt_image, src_image_stack,
-                                                    do_exp=(opt.explain_reg_weight > 0), is_training=True)
+                                                       do_exp=(opt.explain_reg_weight > 0), is_training=True)
 
         with tf.name_scope("compute_loss"):
             pixel_loss = 0
