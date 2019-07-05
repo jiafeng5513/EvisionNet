@@ -356,7 +356,8 @@ def find_latest_ckpt(ckpt_path):
         if os.path.splitext(file)[1] == '.meta':
             prefix = os.path.splitext(file)[0]
             if prefix =='model.latest':
-                return prefix
+                # return prefix
+                pass
             else:
                 dict_meta[prefix.split('-')[1]]=prefix
     return dict_meta[max(dict_meta, key=dict_meta.get)]

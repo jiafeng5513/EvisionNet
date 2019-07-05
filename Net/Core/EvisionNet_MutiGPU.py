@@ -305,6 +305,167 @@ def is_valid_sample(frames, tgt_idx, seq_length):
     return False
 
 
+def get_reference_explain_mask(downscaling):
+    tmp = np.array([0, 1])
+    ref_exp_mask = np.tile(tmp, (FLAGS.batch_size, int(FLAGS.img_height / (2 ** downscaling)),
+                                                int(FLAGS.img_width / (2 ** downscaling)), 1))
+    ref_exp_mask = tf.constant(ref_exp_mask, dtype=tf.float32)
+    return ref_exp_mask
+
+
+def compute_exp_reg_loss(pred, ref):
+    l = tf.nn.softmax_cross_entropy_with_logits(
+        labels=tf.reshape(ref, [-1, 2]),
+        logits=tf.reshape(pred, [-1, 2]))
+    return tf.reduce_mean(l)
+
+
+def compute_smooth_loss(pred_disp):
+    def gradient(pred):
+        D_dy = pred[:, 1:, :, :] - pred[:, :-1, :, :]
+        D_dx = pred[:, :, 1:, :] - pred[:, :, :-1, :]
+        return D_dx, D_dy
+
+    dx, dy = gradient(pred_disp)
+    dx2, dxdy = gradient(dx)
+    dydx, dy2 = gradient(dy)
+    return tf.reduce_mean(tf.abs(dx2)) + \
+           tf.reduce_mean(tf.abs(dxdy)) + \
+           tf.reduce_mean(tf.abs(dydx)) + \
+           tf.reduce_mean(tf.abs(dy2))
+
+
+def loss(tgt_image, src_image_stack, intrinsics, pred_disp, pred_poses, pred_exp_logits):
+    """
+
+    :param tgt_image:
+    :param src_image_stack:
+    :param intrinsics:
+    :param pred_disp:
+    :param pred_poses:
+    :param pred_exp_logits:
+    :return:
+    """
+    with tf.name_scope("compute_loss"):
+        pixel_loss = 0
+        exp_loss = 0
+        smooth_loss = 0
+        tgt_image_all = []
+        src_image_stack_all = []
+        proj_image_stack_all = []
+        proj_error_stack_all = []
+        exp_mask_stack_all = []
+        pred_depth = [1. / d for d in pred_disp]
+        for s in range(FLAGS.num_scales):
+            if FLAGS.explain_reg_weight > 0:
+                # Construct a reference explainability mask (i.e. all
+                # pixels are explainable)
+                ref_exp_mask = get_reference_explain_mask(s)
+            # Scale the source and target images for computing loss at the
+            # according scale.
+            curr_tgt_image = tf.image.resize_area(tgt_image, [int(FLAGS.img_height / (2 ** s)), int(FLAGS.img_width / (2 ** s))])
+            curr_src_image_stack = tf.image.resize_area(src_image_stack,
+                                                        [int(FLAGS.img_height / (2 ** s)),
+                                                         int(FLAGS.img_width / (2 ** s))])
+
+            if FLAGS.smooth_weight > 0:
+                smooth_loss += FLAGS.smooth_weight / (2 ** s) * \
+                               compute_smooth_loss(pred_disp[s])
+
+            for i in range(FLAGS.num_source):
+                # Inverse warp the source image to the target image frame
+                curr_proj_image = projective_inverse_warp(
+                    curr_src_image_stack[:, :, :, 3 * i:3 * (i + 1)],
+                    tf.squeeze(pred_depth[s], axis=3),
+                    pred_poses[:, i, :],
+                    intrinsics[:, s, :, :])
+                curr_proj_error = tf.abs(curr_proj_image - curr_tgt_image)
+                # Cross-entropy loss as regularization for the
+                # explainability prediction
+                if FLAGS.explain_reg_weight > 0:
+                    curr_exp_logits = tf.slice(pred_exp_logits[s],
+                                               [0, 0, 0, i * 2],
+                                               [-1, -1, -1, 2])
+                    exp_loss += FLAGS.explain_reg_weight * compute_exp_reg_loss(curr_exp_logits, ref_exp_mask)
+                    curr_exp = tf.nn.softmax(curr_exp_logits)
+                # Photo-consistency loss weighted by explainability
+                if FLAGS.explain_reg_weight > 0:
+                    pixel_loss += tf.reduce_mean(curr_proj_error * tf.expand_dims(curr_exp[:, :, :, 1], -1))
+                else:
+                    pixel_loss += tf.reduce_mean(curr_proj_error)
+                    # Prepare images for tensorboard summaries
+                if i == 0:
+                    proj_image_stack = curr_proj_image
+                    proj_error_stack = curr_proj_error
+                    if FLAGS.explain_reg_weight > 0:
+                        exp_mask_stack = tf.expand_dims(curr_exp[:, :, :, 1], -1)
+                else:
+                    proj_image_stack = tf.concat([proj_image_stack, curr_proj_image], axis=3)
+                    proj_error_stack = tf.concat([proj_error_stack, curr_proj_error], axis=3)
+                    if FLAGS.explain_reg_weight > 0:
+                        exp_mask_stack = tf.concat([exp_mask_stack, tf.expand_dims(curr_exp[:, :, :, 1], -1)], axis=3)
+            tgt_image_all.append(curr_tgt_image)
+            src_image_stack_all.append(curr_src_image_stack)
+            proj_image_stack_all.append(proj_image_stack)
+            proj_error_stack_all.append(proj_error_stack)
+            if FLAGS.explain_reg_weight > 0:
+                exp_mask_stack_all.append(exp_mask_stack)
+        total_loss = pixel_loss + smooth_loss + exp_loss
+
+        tf.add_to_collection('losses', total_loss)
+
+        return total_loss
+
+
+
+
+    # # 计算batch的平均交叉熵损失
+    # labels = tf.cast(labels, tf.int64)
+    # cross_entropy = tf.nn.sparse_softmax_cross_entropy_with_logits(labels=labels, logits=logits,
+    #                                                                name='cross_entropy_per_example')
+    # cross_entropy_mean = tf.reduce_mean(cross_entropy, name='cross_entropy')
+    # tf.add_to_collection('losses', cross_entropy_mean)  # 交叉熵损失
+    #
+    # # The total loss is defined as the cross entropy loss plus all of the weight
+    # # decay terms (L2 loss).
+    # return tf.add_n(tf.get_collection('losses'), name='total_loss')
+
+
+def tower_loss(scope):
+    """计算单卡上的损失值
+    Args:
+      scope: 指定显卡的唯一标识前缀, e.g. 'tower_0'
+    Returns:
+       Tensor of shape [] containing the total loss for a batch of data
+    """
+    # 输入图像和标签
+    images, labels = inputs(train=True, batch_size=FLAGS.batch_size, num_epochs=FLAGS.num_epochs)
+    # 过网络
+    logits = inference(images)
+
+
+
+    # 损失计算
+    _ = loss(logits, labels)
+
+    # 收集当前显卡的损失
+    losses = tf.get_collection('losses', scope)
+
+    # 计算当前显卡的总损失
+    total_loss = tf.add_n(losses, name='total_loss')
+
+    # Attach a scalar summary to all individual losses and the total loss; do
+    # the same for the averaged version of the losses.
+    if FLAGS.tb_logging:
+        for l in losses + [total_loss]:
+            # Remove 'tower_[0-9]/' from the name in case this is a multi-GPU
+            # training session. This helps the clarity of presentation on
+            # tensorboard.
+            loss_name = re.sub('%s_[0-9]*/' % TOWER_NAME, '', l.op.name)
+            tf.summary.scalar(loss_name, l)
+
+    return total_loss
+
 class EvisionNet(object):
     def __init__(self):
         pass
@@ -323,13 +484,12 @@ class EvisionNet(object):
             src_image_stack = self.preprocess_image(src_image_stack)
 
         with tf.name_scope("depth_prediction"):
-            pred_disp, depth_net_endpoints = disp_net(tgt_image, is_training=True)
+            pred_disp = disp_net(tgt_image, is_training=True)
             pred_depth = [1. / d for d in pred_disp]
 
         with tf.name_scope("pose_and_explainability_prediction"):  # , pose_exp_net_endpoints
-            pred_poses, pred_exp_logits, pose_exp_net_endpoints = pose_exp_net(tgt_image, src_image_stack,
-                                                                               do_exp=(opt.explain_reg_weight > 0),
-                                                                               is_training=True)
+            pred_poses, pred_exp_logits = pose_exp_net(tgt_image, src_image_stack,
+                                                    do_exp=(opt.explain_reg_weight > 0), is_training=True)
 
         with tf.name_scope("compute_loss"):
             pixel_loss = 0
@@ -579,7 +739,7 @@ class EvisionNet(object):
         tgt_image, src_image_stack = loader.batch_unpack_image_sequence(
             input_mc, self.img_height, self.img_width, self.num_source)
         with tf.name_scope("pose_prediction"):
-            pred_poses, _, _ = pose_exp_net(tgt_image, src_image_stack, do_exp=False, is_training=False)
+            pred_poses, _ = pose_exp_net(tgt_image, src_image_stack, do_exp=False, is_training=False)
             self.inputs = input_uint8
             self.pred_poses = pred_poses
 
