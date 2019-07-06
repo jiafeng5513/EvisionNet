@@ -35,6 +35,8 @@ flags.DEFINE_string("checkpoint_dir", "../checkpoints/", "用于保存和加载c
 
 # params for model_train
 flags.DEFINE_string("init_checkpoint_file", None, "用来初始化的ckpt")
+flags.DEFINE_boolean("continue_train", False, "是否从之前的ckpt继续训练")
+
 flags.DEFINE_float("learning_rate", 0.0002, "学习率")
 flags.DEFINE_float("beta1", 0.9, "adam动量参数")
 flags.DEFINE_float("smooth_weight", 0.5, "平滑的权重")
@@ -43,12 +45,12 @@ flags.DEFINE_integer("batch_size", 4, "batch size")
 flags.DEFINE_integer("img_height", 128, "Image height")
 flags.DEFINE_integer("img_width", 416, "Image width")
 flags.DEFINE_integer("seq_length", 3, "一个样本中含有几张图片")
+flags.DEFINE_integer("num_source", 2, "一个样本中有几个是source images,这个值应该比seq_length少1")
 flags.DEFINE_integer("max_steps", 200000, "训练迭代次数")
-flags.DEFINE_integer("summary_freq", 100, "summary频率")
-flags.DEFINE_integer("save_latest_freq", 5000, "保存最新模型的频率(会覆盖之前保存的最新模型)")
-flags.DEFINE_boolean("continue_train", False, "是否从之前的ckpt继续训练")
+flags.DEFINE_integer("summary_freq", 100, "summary频率,单位:batch")
+flags.DEFINE_integer("save_latest_freq", 5000, "保存最新模型的频率(会覆盖之前保存的最新模型),单位:batch")
 flags.DEFINE_integer('num_gpus', 4, "使用多少GPU")
-
+flags.DEFINE_integer('num_epoch',20,"把整个训练集训练多少次")
 # params for model_test_depth
 flags.DEFINE_string("test_file_list", '../data/kitti/test_files_eigen.txt', "Path to the list of test files")
 flags.DEFINE_float("min_depth", 1e-3, "Threshold for minimum depth")
@@ -59,7 +61,6 @@ flags.DEFINE_integer("test_seq", 9, "使用KittiOdometry的哪个序列进行测
 flags.DEFINE_string("output_dir", "./test_output/test_pose/", "Output directory")
 
 # add by jiafeng5513,followed by https://github.com/tinghuiz/SfMLearner/pull/70
-flags.DEFINE_integer("num_source", 2, "number of source images")
 flags.DEFINE_integer("num_scales", 4, "number of used image scales")
 
 FLAGS = flags.FLAGS

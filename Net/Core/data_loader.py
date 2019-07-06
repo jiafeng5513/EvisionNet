@@ -190,3 +190,30 @@ class DataLoader(object):
                 self.make_intrinsics_matrix(fx, fy, cx, cy))
         intrinsics_mscale = tf.stack(intrinsics_mscale, axis=1)
         return intrinsics_mscale
+
+    def data_statistics(self):
+        """
+        输出一些数据集的统计数据
+        训练集样本数量:18361
+        验证集样本数量:2030
+        测试:pose的测试是选取一个序列
+            depth的测试是
+        :return:一个epoch=多少batch,训练集样本数量,验证集样本数量
+        """
+        example_num_of_train = 0
+        example_num_of_val = 0
+        with open(self.dataset_dir + '/%s.txt' % 'train', 'r') as train_file_list:
+            example_num_of_train = len(train_file_list.readlines())
+        with open(self.dataset_dir + '/%s.txt' % 'val', 'r') as val_file_list:
+            example_num_of_val = len(val_file_list.readlines())
+        num_of_examples_in_an_epoch = example_num_of_train // self.batch_size
+        return num_of_examples_in_an_epoch, example_num_of_train, example_num_of_val
+        pass
+
+if __name__ == '__main__':
+    loader = DataLoader("/home/RAID1/DataSet/KITTI/KittiRaw_prepared/", 4, 128, 416, 2, 4)
+    a,b,c = loader.data_statistics()
+
+    print(a)
+    print(b)
+    print(c)
