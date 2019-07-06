@@ -50,7 +50,7 @@ flags.DEFINE_integer("max_steps", 200000, "训练迭代次数")
 flags.DEFINE_integer("summary_freq", 100, "summary频率,单位:batch")
 flags.DEFINE_integer("save_latest_freq", 5000, "保存最新模型的频率(会覆盖之前保存的最新模型),单位:batch")
 flags.DEFINE_integer('num_gpus', 4, "使用多少GPU")
-flags.DEFINE_integer('num_epoch',20,"把整个训练集训练多少次")
+flags.DEFINE_integer('num_epochs',1,"把整个训练集训练多少次")
 # params for model_test_depth
 flags.DEFINE_string("test_file_list", '../data/kitti/test_files_eigen.txt', "Path to the list of test files")
 flags.DEFINE_float("min_depth", 1e-3, "Threshold for minimum depth")
@@ -528,6 +528,7 @@ def train():
 
         loader = DataLoader(FLAGS.dataset_dir, FLAGS.batch_size, FLAGS.img_height, FLAGS.img_width,
                             FLAGS.num_source, FLAGS.num_scales)
+        per_examples_in_an_epoch, num_train_examples, num_val_examples = loader.data_statistics()
         # 每个GPU分别计算梯度
         tower_grads = []
         with tf.variable_scope(tf.get_variable_scope()):
@@ -625,9 +626,11 @@ def train():
                 if step % FLAGS.save_latest_freq == 0:
                     print(" [*] Saving checkpoint to %s..." % FLAGS.checkpoint_dir)
                     saver.save(sess, os.path.join(FLAGS.checkpoint_dir, 'model.latest'))
+                if step >= FLAGS.num_epochs * per_examples_in_an_epoch //FLAGS.num_gpus:
+                    print('Done training for %d epochs, %d steps.' % (FLAGS.num_epochs, step))
+                    coord.request_stop()
                 step += 1
                 #
-
         except tf.errors.OutOfRangeError:
             print('Done training for %d epochs, %d steps.' % (FLAGS.num_epochs, step))
         finally:
