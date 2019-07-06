@@ -23,13 +23,13 @@ MIN_DISP = 0.01
 TOWER_NAME = 'tower'
 
 flags = tf.app.flags
-flags.DEFINE_integer("run_mode", 2, "0=train,1=test_depth,2=test_pose")
-flags.DEFINE_string("dataset_dir", "/home/RAID1/DataSet/KITTI/KittiOdometry/", "数据位置")
+flags.DEFINE_integer("run_mode", 0, "0=train,1=test_depth,2=test_pose")
+flags.DEFINE_string("dataset_dir", "/home/RAID1/DataSet/KITTI/KittiRaw_prepared/", "数据位置")
 # KittiOdometry,KittiOdometry_prepared,KittiRaw,KittiRaw_prepared
 
-# test pose  : KittiOdometry
+# test pose  : KittiOdometry     /home/RAID1/DataSet/KITTI/KittiOdometry/
 # test depth : KittiRaw
-# train      : KittiRaw_prepared
+# train      : KittiRaw_prepared /home/RAID1/DataSet/KITTI/KittiRaw_prepared/
 
 flags.DEFINE_string("checkpoint_dir", "../checkpoints/", "用于保存和加载ckpt的目录")
 
@@ -39,7 +39,7 @@ flags.DEFINE_float("learning_rate", 0.0002, "学习率")
 flags.DEFINE_float("beta1", 0.9, "adam动量参数")
 flags.DEFINE_float("smooth_weight", 0.5, "平滑的权重")
 flags.DEFINE_float("explain_reg_weight", 0.0, "Weight for explanability regularization")
-flags.DEFINE_integer("batch_size", 1, "batch size")
+flags.DEFINE_integer("batch_size", 4, "batch size")
 flags.DEFINE_integer("img_height", 128, "Image height")
 flags.DEFINE_integer("img_width", 416, "Image width")
 flags.DEFINE_integer("seq_length", 3, "一个样本中含有几张图片")
@@ -59,8 +59,8 @@ flags.DEFINE_integer("test_seq", 9, "使用KittiOdometry的哪个序列进行测
 flags.DEFINE_string("output_dir", "./test_output/test_pose/", "Output directory")
 
 # add by jiafeng5513,followed by https://github.com/tinghuiz/SfMLearner/pull/70
-flags.DEFINE_integer("num_source", None, "number of source images")
-flags.DEFINE_integer("num_scales", None, "number of used image scales")
+flags.DEFINE_integer("num_source", 2, "number of source images")
+flags.DEFINE_integer("num_scales", 4, "number of used image scales")
 
 FLAGS = flags.FLAGS
 
@@ -90,11 +90,10 @@ def _activation_summary(x):
     """
     # Remove 'tower_[0-9]/' from the name in case this is a multi-GPU training
     # session. This helps the clarity of presentation on tensorboard.
-    if FLAGS.tb_logging:
-        tensor_name = re.sub('%s_[0-9]*/' % TOWER_NAME, '', x.op.name)
-        tf.summary.histogram(tensor_name + '/activations', x)
-        tf.summary.scalar(tensor_name + '/sparsity',
-                          tf.nn.zero_fraction(x))
+
+    tensor_name = re.sub('%s_[0-9]*/' % TOWER_NAME, '', x.op.name)
+    tf.summary.histogram(tensor_name + '/activations', x)
+    tf.summary.scalar(tensor_name + '/sparsity',tf.nn.zero_fraction(x))
 
 
 def _variable_with_weight_decay(name, shape, stddev, wd):
@@ -132,11 +131,11 @@ def _variable_on_cpu(name, shape, initializer):
 
 def _conv2d_with_relu(input_data, out_channels, filter_height, filter_width, stride, name, use_activation=True):
     with tf.variable_scope(name) as scope:
-        in_channels = input_data.get_shape()[3]  # input[batch_size, in_height, in_width, in_channels]
+        in_channels = input_data.get_shape().as_list()[3]  # input[batch_size, in_height, in_width, in_channels]
         kernel = _variable_with_weight_decay('weights', shape=[filter_height, filter_width, in_channels, out_channels],
                                              stddev=5e-2, wd=0.0)
         biases = _variable_on_cpu('biases', [out_channels], tf.constant_initializer(0.0))
-        conv = tf.nn.conv2d(input_data, kernel, strides=[stride, stride, stride, stride], padding='SAME')
+        conv = tf.nn.conv2d(input_data, kernel, strides=[1, stride, stride, 1], padding='SAME')
         pre_activation = tf.nn.bias_add(conv, biases)
         if use_activation:
             conv1 = tf.nn.relu(pre_activation, name=scope.name)
@@ -147,11 +146,11 @@ def _conv2d_with_relu(input_data, out_channels, filter_height, filter_width, str
 
 def _conv2d_with_sigmoid(input_data, out_channels, filter_height, filter_width, stride, name, use_activation=True):
     with tf.variable_scope(name) as scope:
-        in_channels = input_data.get_shape()[3]  # input[batch_size, in_height, in_width, in_channels]
+        in_channels = input_data.get_shape().as_list()[3]  # input[batch_size, in_height, in_width, in_channels]
         kernel = _variable_with_weight_decay('weights', shape=[filter_height, filter_width, in_channels, out_channels],
                                              stddev=5e-2, wd=0.0)
         biases = _variable_on_cpu('biases', [out_channels], tf.constant_initializer(0.0))
-        conv = tf.nn.conv2d(input_data, kernel, strides=[stride, stride, stride, stride], padding='SAME')
+        conv = tf.nn.conv2d(input_data, kernel, strides=[1, stride, stride, 1], padding='SAME')
         pre_activation = tf.nn.bias_add(conv, biases)
         if use_activation:
             conv1 = tf.nn.sigmoid(pre_activation, name=scope.name)
@@ -162,14 +161,15 @@ def _conv2d_with_sigmoid(input_data, out_channels, filter_height, filter_width, 
 
 def _conv2d_transpose(input_data, out_channels, filter_height, filter_width, stride, name, use_activation=True):
     with tf.variable_scope(name) as scope:
-        in_channels = input_data.get_shape()[3]  # input[batch_size, in_height, in_width, in_channels]
+        in_channels = input_data.get_shape().as_list()[3]  # input[batch_size, in_height, in_width, in_channels]
         kernel = _variable_with_weight_decay('weights', shape=[filter_height, filter_width, out_channels, in_channels],
                                              stddev=5e-2, wd=0.0)
         biases = _variable_on_cpu('biases', [out_channels], tf.constant_initializer(0.0))
 
         transpose_conv = tf.nn.conv2d_transpose(value=input_data, filter=kernel,
-                                                output_shape=[1, input_data.get_shape()[1] * 2,
-                                                              input_data.get_shape()[2] * 2, out_channels],
+                                                output_shape=[input_data.get_shape().as_list()[0],
+                                                              input_data.get_shape().as_list()[1] * 2,
+                                                              input_data.get_shape().as_list()[2] * 2, out_channels],
                                                 strides=[1, stride, stride, 1], padding='SAME')
 
         pre_activation = tf.nn.bias_add(transpose_conv, biases)
@@ -466,13 +466,13 @@ def tower_loss(loader, scope):
 
     # Attach a scalar summary to all individual losses and the total loss; do
     # the same for the averaged version of the losses.
-    if FLAGS.tb_logging:
-        for l in [total_loss]:
-            # Remove 'tower_[0-9]/' from the name in case this is a multi-GPU
-            # training session. This helps the clarity of presentation on
-            # tensorboard.
-            loss_name = re.sub('%s_[0-9]*/' % TOWER_NAME, '', l.op.name)
-            tf.summary.scalar(loss_name, l)
+
+    for l in [total_loss]:
+        # Remove 'tower_[0-9]/' from the name in case this is a multi-GPU
+        # training session. This helps the clarity of presentation on
+        # tensorboard.
+        loss_name = re.sub('%s_[0-9]*/' % TOWER_NAME, '', l.op.name)
+        tf.summary.scalar(loss_name, l)
 
     return total_loss
 
@@ -555,21 +555,21 @@ def train():
         grads = average_gradients(tower_grads)
 
         # 梯度变化图
-        if FLAGS.tb_logging:
-            for grad, var in grads:
-                if grad is not None:
-                    summaries.append(
-                        tf.summary.histogram(var.op.name + '/gradients', grad))
-            # Add a summary to track the learning rate.
-            summaries.append(tf.summary.scalar('learning_rate', FLAGS.learning_rate))  # 目前使用的是固定学习率 TODO:策略学习率
+
+        for grad, var in grads:
+            if grad is not None:
+                summaries.append(
+                    tf.summary.histogram(var.op.name + '/gradients', grad))
+        # Add a summary to track the learning rate.
+        summaries.append(tf.summary.scalar('learning_rate', FLAGS.learning_rate))  # 目前使用的是固定学习率 TODO:策略学习率
 
         # 应用梯度
         train_op = opt.apply_gradients(grads, global_step=global_step)
 
         # 可训练变量的曲线图
-        if FLAGS.tb_logging:
-            for var in tf.trainable_variables():
-                summaries.append(tf.summary.histogram(var.op.name, var))
+
+        for var in tf.trainable_variables():
+            summaries.append(tf.summary.histogram(var.op.name, var))
 
         # Create a saver.
         saver = tf.train.Saver(tf.global_variables(), sharded=True)
@@ -588,14 +588,14 @@ def train():
         # implementations.
         sess = tf.Session(config=tf.ConfigProto(
             allow_soft_placement=True,
-            log_device_placement=FLAGS.log_device_placement))
+            log_device_placement=False))
         sess.run(init_op)
 
         # Start input enqueue threads.
         coord = tf.train.Coordinator()
         threads = tf.train.start_queue_runners(sess=sess, coord=coord)
 
-        summary_writer = tf.summary.FileWriter(FLAGS.train_dir, sess.graph)
+        summary_writer = tf.summary.FileWriter(FLAGS.checkpoint_dir, sess.graph)
 
         try:
             step = 0
@@ -622,7 +622,7 @@ def train():
                     format_str = '%s: step %d, loss = %.2f (%.1f examples/sec; %.3f sec/batch)'
                     print(format_str % (datetime.now(), step, loss_value, examples_per_sec, sec_per_batch))
                 # 模型保存
-                if step % 1000 == 0 or (step + 1) == FLAGS.num_epochs * FLAGS.batch_size:
+                if step % 1000 == 0 : # or (step + 1) == FLAGS.num_epochs * FLAGS.batch_size TODO :num_epochs
                     print(" [*] Saving checkpoint to %s..." % FLAGS.checkpoint_dir)
                     saver.save(sess, os.path.join(FLAGS.checkpoint_dir, 'model'), global_step=step)
                 if step % FLAGS.save_latest_freq == 0:
@@ -975,8 +975,9 @@ def model_train_all():
     if not os.path.exists(FLAGS.checkpoint_dir):
         os.makedirs(FLAGS.checkpoint_dir)
 
-    sfm = EvisionNet()
-    sfm.train(FLAGS)
+    train()
+    # sfm = EvisionNet()
+    # sfm.train(FLAGS)
 
 
 def model_test_depth():
