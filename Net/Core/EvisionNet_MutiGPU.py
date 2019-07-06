@@ -93,7 +93,7 @@ def _activation_summary(x):
 
     tensor_name = re.sub('%s_[0-9]*/' % TOWER_NAME, '', x.op.name)
     tf.summary.histogram(tensor_name + '/activations', x)
-    tf.summary.scalar(tensor_name + '/sparsity',tf.nn.zero_fraction(x))
+    tf.summary.scalar(tensor_name + '/sparsity', tf.nn.zero_fraction(x))
 
 
 def _variable_with_weight_decay(name, shape, stddev, wd):
@@ -467,12 +467,7 @@ def tower_loss(loader, scope):
     # Attach a scalar summary to all individual losses and the total loss; do
     # the same for the averaged version of the losses.
 
-    for l in [total_loss]:
-        # Remove 'tower_[0-9]/' from the name in case this is a multi-GPU
-        # training session. This helps the clarity of presentation on
-        # tensorboard.
-        loss_name = re.sub('%s_[0-9]*/' % TOWER_NAME, '', l.op.name)
-        tf.summary.scalar(loss_name, l)
+    tf.summary.scalar(scope + '_total_loss', total_loss, family='total_loss')
 
     return total_loss
 
@@ -527,7 +522,7 @@ def train():
         #                                 LEARNING_RATE_DECAY_FACTOR,
         #                                 staircase=True)
         # 使用动量优化器,目前是固定学习率,TODO:策略学习率
-        #opt = tf.train.MomentumOptimizer(lr, 0.9, use_nesterov=True, use_locking=True)
+        # opt = tf.train.MomentumOptimizer(lr, 0.9, use_nesterov=True, use_locking=True)
         opt = tf.train.AdamOptimizer(FLAGS.learning_rate, FLAGS.beta1, use_locking=True)
 
         loader = DataLoader(FLAGS.dataset_dir, FLAGS.batch_size, FLAGS.img_height, FLAGS.img_width,
@@ -545,7 +540,7 @@ def train():
                         # Reuse variables for the next tower.
                         tf.get_variable_scope().reuse_variables()
                         # Retain the summaries from the final tower.
-                        summaries = tf.get_collection(tf.GraphKeys.SUMMARIES, scope)
+                        summaries = tf.get_collection(tf.GraphKeys.SUMMARIES)
                         # 计算此批数据的梯度
                         grads = opt.compute_gradients(_loss, gate_gradients=0)
                         # 跟踪所有卡的梯度。
@@ -561,7 +556,8 @@ def train():
                 summaries.append(
                     tf.summary.histogram(var.op.name + '/gradients', grad))
         # Add a summary to track the learning rate.
-        summaries.append(tf.summary.scalar('learning_rate', FLAGS.learning_rate))  # 目前使用的是固定学习率 TODO:策略学习率
+        summaries.append(
+            tf.summary.scalar('learning_rate', FLAGS.learning_rate, family='global'))  # 目前使用的是固定学习率 TODO:策略学习率
 
         # 应用梯度
         train_op = opt.apply_gradients(grads, global_step=global_step)
@@ -599,7 +595,7 @@ def train():
 
         try:
             step = 0
-            saver = tf.train.Saver([var for var in tf.model_variables()] + [global_step],max_to_keep=10)
+            # saver = tf.train.Saver([var for var in tf.model_variables()] + [global_step],max_to_keep=10)
             while not coord.should_stop():
                 start_time = time.time()
 
@@ -622,17 +618,17 @@ def train():
                     format_str = '%s: step %d, loss = %.2f (%.1f examples/sec; %.3f sec/batch)'
                     print(format_str % (datetime.now(), step, loss_value, examples_per_sec, sec_per_batch))
                 # 模型保存
-                if step % 1000 == 0 : # or (step + 1) == FLAGS.num_epochs * FLAGS.batch_size TODO :num_epochs
+                if step % 1000 == 0:  # or (step + 1) == FLAGS.num_epochs * FLAGS.batch_size TODO :num_epochs
                     print(" [*] Saving checkpoint to %s..." % FLAGS.checkpoint_dir)
                     saver.save(sess, os.path.join(FLAGS.checkpoint_dir, 'model'), global_step=step)
                 if step % FLAGS.save_latest_freq == 0:
                     print(" [*] Saving checkpoint to %s..." % FLAGS.checkpoint_dir)
                     saver.save(sess, os.path.join(FLAGS.checkpoint_dir, 'model.latest'))
                 step += 1
+                #
 
         except tf.errors.OutOfRangeError:
-            print('Done training for %d epochs, %d steps.' % (
-                FLAGS.num_epochs, step))
+            print('Done training for %d epochs, %d steps.' % (FLAGS.num_epochs, step))
         finally:
             # When done, ask the threads to stop.
             coord.request_stop()
@@ -974,7 +970,9 @@ def model_train_all():
 
     if not os.path.exists(FLAGS.checkpoint_dir):
         os.makedirs(FLAGS.checkpoint_dir)
-
+    if len(os.listdir(FLAGS.checkpoint_dir)) != 0:
+        for file in os.listdir(FLAGS.checkpoint_dir):
+            os.remove(os.path.join(FLAGS.checkpoint_dir, file))
     train()
     # sfm = EvisionNet()
     # sfm.train(FLAGS)
