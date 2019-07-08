@@ -11,6 +11,7 @@ from pose_evaluation_utils import dump_pose_seq_TUM
 from tensorflow.contrib.layers.python.layers import utils
 from glob import glob
 from data_loader import DataLoader
+from data_loader import *
 from utils import *
 
 # Range of disparity/inverse depth values
@@ -38,7 +39,7 @@ flags.DEFINE_integer("batch_size", 1, "batch size")
 flags.DEFINE_integer("img_height", 128, "Image height")
 flags.DEFINE_integer("img_width", 416, "Image width")
 flags.DEFINE_integer("seq_length", 3, "一个样本中含有几张图片")
-flags.DEFINE_integer("max_steps", 200000, "训练迭代次数")
+flags.DEFINE_integer("max_steps", 10000, "训练迭代次数")
 flags.DEFINE_integer("summary_freq", 100, "summary频率")
 flags.DEFINE_integer("save_latest_freq", 5000,"保存最新模型的频率(会覆盖之前保存的最新模型)")
 flags.DEFINE_boolean("continue_train", False, "是否从之前的ckpt继续训练")
@@ -526,8 +527,8 @@ class EvisionNet(object):
         input_uint8 = tf.placeholder(tf.uint8, [self.batch_size, self.img_height, self.img_width * self.seq_length, 3],
                                      name='raw_input')
         input_mc = self.preprocess_image(input_uint8)
-        loader = DataLoader()
-        tgt_image, src_image_stack = loader.batch_unpack_image_sequence(
+        #loader = DataLoader()
+        tgt_image, src_image_stack = batch_unpack_image_sequence(
                 input_mc, self.img_height, self.img_width, self.num_source)
         with tf.name_scope("pose_prediction"):
             pred_poses, _, _ = pose_exp_net(tgt_image, src_image_stack, do_exp=False, is_training=False)

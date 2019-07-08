@@ -2,6 +2,34 @@ from __future__ import division
 import os
 import random
 import tensorflow as tf
+import time
+
+def preprocess_image(image):
+    # Assuming input image is uint8
+    image = tf.image.convert_image_dtype(image, dtype=tf.float32)
+    return image * 2. - 1.
+
+def batch_unpack_image_sequence(image_seq, img_height, img_width, num_source):
+    # Assuming the center image is the target frame
+    tgt_start_idx = int(img_width * (num_source//2))
+    tgt_image = tf.slice(image_seq,
+                         [0, 0, tgt_start_idx, 0],
+                         [-1, -1, img_width, -1])
+    # Source frames before the target frame
+    src_image_1 = tf.slice(image_seq,
+                           [0, 0, 0, 0],
+                           [-1, -1, int(img_width * (num_source//2)), -1])
+    # Source frames after the target frame
+    src_image_2 = tf.slice(image_seq,
+                           [0, 0, int(tgt_start_idx + img_width), 0],
+                           [-1, -1, int(img_width * (num_source//2)), -1])
+    src_image_seq = tf.concat([src_image_1, src_image_2], axis=2)
+    # Stack source frames along the color channels (i.e. [B, H, W, N*3])
+    src_image_stack = tf.concat([tf.slice(src_image_seq,
+                                [0, 0, i*img_width, 0],
+                                [-1, -1, img_width, -1])
+                                for i in range(num_source)], axis=3)
+    return tgt_image, src_image_stack
 
 class DataLoader(object):
     def __init__(self, 
@@ -17,31 +45,29 @@ class DataLoader(object):
         self.img_width = img_width
         self.num_source = num_source
         self.num_scales = num_scales
+        seed = random.randint(0, 2 ** 31 - 1)
 
-    def load_train_batch(self):
-        """Load a batch of training instances.
-        """
-        seed = random.randint(0, 2**31 - 1)
+
+
         # Load the list of training files into queues
         file_list = self.format_file_list(self.dataset_dir, 'train')
         image_paths_queue = tf.train.string_input_producer(
-            file_list['image_file_list'], 
-            seed=seed, 
+            file_list['image_file_list'],
+            seed=seed,
             shuffle=True)
         cam_paths_queue = tf.train.string_input_producer(
-            file_list['cam_file_list'], 
-            seed=seed, 
+            file_list['cam_file_list'],
+            seed=seed,
             shuffle=True)
-        self.steps_per_epoch = int(
-            len(file_list['image_file_list'])//self.batch_size)
 
-        # Load images
+
         img_reader = tf.WholeFileReader()
         _, image_contents = img_reader.read(image_paths_queue)
         image_seq = tf.image.decode_jpeg(image_contents)
-        tgt_image, src_image_stack = \
-            self.unpack_image_sequence(
-                image_seq, self.img_height, self.img_width, self.num_source)
+        self.tgt_image, self.src_image_stack = self.unpack_image_sequence(image_seq,
+                                                                self.img_height,
+                                                                self.img_width,
+                                                                self.num_source)
 
         # Load camera intrinsics
         cam_reader = tf.TextLineReader()
@@ -49,25 +75,32 @@ class DataLoader(object):
         rec_def = []
         for i in range(9):
             rec_def.append([1.])
-        raw_cam_vec = tf.decode_csv(raw_cam_contents, 
-                                    record_defaults=rec_def)
+        raw_cam_vec = tf.decode_csv(raw_cam_contents, record_defaults=rec_def)
         raw_cam_vec = tf.stack(raw_cam_vec)
-        intrinsics = tf.reshape(raw_cam_vec, [3, 3])
+        self.intrinsics = tf.reshape(raw_cam_vec, [3, 3])
+        print("data loader init")
 
+
+    def load_train_batch(self):
+        """Load a batch of training instances.
+        """
+        # Load images
         # Form training batches
-        src_image_stack, tgt_image, intrinsics = \
-                tf.train.batch([src_image_stack, tgt_image, intrinsics], 
+        src_image_stack, tgt_image, intrinsics = tf.train.batch([self.src_image_stack, self.tgt_image, self.intrinsics],
                                batch_size=self.batch_size)
-
         # Data augmentation
         image_all = tf.concat([tgt_image, src_image_stack], axis=3)
-        image_all, intrinsics = self.data_augmentation(
-            image_all, intrinsics, self.img_height, self.img_width)
+        image_all, intrinsics = self.data_augmentation(image_all, intrinsics, self.img_height, self.img_width)
         tgt_image = image_all[:, :, :, :3]
         src_image_stack = image_all[:, :, :, 3:]
-        intrinsics = self.get_multi_scale_intrinsics(
-            intrinsics, self.num_scales)
+        intrinsics = self.get_multi_scale_intrinsics(intrinsics, self.num_scales)
+        tgt_image = preprocess_image(tgt_image)
+        src_image_stack = preprocess_image(src_image_stack)
         return tgt_image, src_image_stack, intrinsics
+
+    def load_val_batch(self):
+
+        pass
 
     def make_intrinsics_matrix(self, fx, fy, cx, cy):
         # Assumes batch input
@@ -156,27 +189,7 @@ class DataLoader(object):
         tgt_image.set_shape([img_height, img_width, 3])
         return tgt_image, src_image_stack
 
-    def batch_unpack_image_sequence(self, image_seq, img_height, img_width, num_source):
-        # Assuming the center image is the target frame
-        tgt_start_idx = int(img_width * (num_source//2))
-        tgt_image = tf.slice(image_seq, 
-                             [0, 0, tgt_start_idx, 0], 
-                             [-1, -1, img_width, -1])
-        # Source frames before the target frame
-        src_image_1 = tf.slice(image_seq, 
-                               [0, 0, 0, 0], 
-                               [-1, -1, int(img_width * (num_source//2)), -1])
-        # Source frames after the target frame
-        src_image_2 = tf.slice(image_seq, 
-                               [0, 0, int(tgt_start_idx + img_width), 0], 
-                               [-1, -1, int(img_width * (num_source//2)), -1])
-        src_image_seq = tf.concat([src_image_1, src_image_2], axis=2)
-        # Stack source frames along the color channels (i.e. [B, H, W, N*3])
-        src_image_stack = tf.concat([tf.slice(src_image_seq, 
-                                    [0, 0, i*img_width, 0], 
-                                    [-1, -1, img_width, -1]) 
-                                    for i in range(num_source)], axis=3)
-        return tgt_image, src_image_stack
+
 
     def get_multi_scale_intrinsics(self, intrinsics, num_scales):
         intrinsics_mscale = []
@@ -198,7 +211,7 @@ class DataLoader(object):
         验证集样本数量:2030
         测试:pose的测试是选取一个序列
             depth的测试是
-        :return:一个epoch=多少batch,训练集样本数量,验证集样本数量
+        :return:batch num in a epoch,训练集样本数量,验证集样本数量
         """
         example_num_of_train = 0
         example_num_of_val = 0
@@ -206,14 +219,40 @@ class DataLoader(object):
             example_num_of_train = len(train_file_list.readlines())
         with open(self.dataset_dir + '/%s.txt' % 'val', 'r') as val_file_list:
             example_num_of_val = len(val_file_list.readlines())
-        num_of_examples_in_an_epoch = example_num_of_train // self.batch_size
-        return num_of_examples_in_an_epoch, example_num_of_train, example_num_of_val
+        num_of_batch_in_an_epoch = example_num_of_train // self.batch_size
+        return num_of_batch_in_an_epoch, example_num_of_train, example_num_of_val
         pass
 
-if __name__ == '__main__':
-    loader = DataLoader("/home/RAID1/DataSet/KITTI/KittiRaw_prepared/", 4, 128, 416, 2, 4)
-    a,b,c = loader.data_statistics()
 
-    print(a)
-    print(b)
-    print(c)
+
+def CreateDataset(data_dir):
+    dataset = tf.data.Dataset.from_tensor_slices(tf.random_uniform([4, 10]))
+
+    pass
+
+if __name__ == '__main__':
+
+    '''
+                     dataset_dir=None, 
+                 batch_size=None, 
+                 img_height=None, 
+                 img_width=None, 
+                 num_source=None, 
+                 num_scales=None):
+    '''
+    sesson =tf.Session()
+    loader = DataLoader(dataset_dir="/home/RAID1/DataSet/KITTI/KittiRaw_prepared/",
+                        batch_size=4,
+                        img_height=128,
+                        img_width=416,
+                        num_source=2,
+                        num_scales=4)
+    num_of_batch_in_an_epoch, example_num_of_train, example_num_of_val = loader.data_statistics()
+    start_time = time.time()
+    tgt_image, src_image_stack, intrinsics = loader.load_train_batch()
+    used_time = time.time() - start_time
+
+    print('num_of_batch_in_an_epoch=%d' % num_of_batch_in_an_epoch)
+    print('example_num_of_train=%d' % example_num_of_train)
+    print('example_num_of_val=%d' % example_num_of_val)
+    print ("time used for read a batch:%f s"%(used_time))

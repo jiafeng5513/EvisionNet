@@ -356,11 +356,11 @@ def find_latest_ckpt(ckpt_path):
         if os.path.splitext(file)[1] == '.meta':
             prefix = os.path.splitext(file)[0]
             if prefix =='model.latest':
-                # return prefix
+                return prefix
                 pass
             else:
-                dict_meta[prefix.split('-')[1]]=prefix
-    return dict_meta[max(dict_meta, key=dict_meta.get)]
+                dict_meta[int(prefix.split('-')[1])]=prefix
+    return dict_meta[max(dict_meta.keys())]
 
 
 def evaluate_depth(pred_depths,test_file_list,kitti_dir,min_depth,max_depth):
@@ -468,3 +468,5 @@ def evaluate_pose(pred_dir,gtruth_dir):
     print("ATE(Absolute Trajectory Error,绝对轨迹误差) mean: %.4f, std: %.4f" % (np.mean(ate_all), np.std(ate_all)))
     pass
 
+if __name__ == '__main__':
+    print(find_latest_ckpt('../checkpoints'))

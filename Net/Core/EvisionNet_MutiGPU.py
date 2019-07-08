@@ -12,6 +12,7 @@ from pose_evaluation_utils import dump_pose_seq_TUM
 from tensorflow.contrib.layers.python.layers import utils
 from glob import glob
 from data_loader import DataLoader
+from data_loader import *
 from utils import *
 import re
 from datetime import datetime
@@ -40,17 +41,17 @@ flags.DEFINE_boolean("continue_train", False, "是否从之前的ckpt继续训�
 flags.DEFINE_float("learning_rate", 0.0002, "学习率")
 flags.DEFINE_float("beta1", 0.9, "adam动量参数")
 flags.DEFINE_float("smooth_weight", 0.5, "平滑的权重")
-flags.DEFINE_float("explain_reg_weight", 0.0, "Weight for explanability regularization")
-flags.DEFINE_integer("batch_size", 4, "batch size")
+flags.DEFINE_float("explain_reg_weight", 0.2, "Weight for explanability regularization")
+flags.DEFINE_integer("batch_size", 16, "batch size")
 flags.DEFINE_integer("img_height", 128, "Image height")
 flags.DEFINE_integer("img_width", 416, "Image width")
 flags.DEFINE_integer("seq_length", 3, "一个样本中含有几张图片")
 flags.DEFINE_integer("num_source", 2, "一个样本中有几个是source images,这个值应该比seq_length少1")
 flags.DEFINE_integer("max_steps", 200000, "训练迭代次数")
-flags.DEFINE_integer("summary_freq", 100, "summary频率,单位:batch")
-flags.DEFINE_integer("save_latest_freq", 5000, "保存最新模型的频率(会覆盖之前保存的最新模型),单位:batch")
+flags.DEFINE_integer("summary_freq", 100, "summary频率,单位:batch*num_gpus")
+flags.DEFINE_integer("save_freq", 1000, "保存频率,单位:batch*num_gpus")
 flags.DEFINE_integer('num_gpus', 4, "使用多少GPU")
-flags.DEFINE_integer('num_epochs',1,"把整个训练集训练多少次")
+flags.DEFINE_integer('num_epochs', 30, "把整个训练集训练多少次")
 # params for model_test_depth
 flags.DEFINE_string("test_file_list", '../data/kitti/test_files_eigen.txt', "Path to the list of test files")
 flags.DEFINE_float("min_depth", 1e-3, "Threshold for minimum depth")
@@ -72,12 +73,6 @@ def resize_like(inputs, ref):
     if iH == rH and iW == rW:
         return inputs
     return tf.image.resize_nearest_neighbor(inputs, [rH.value, rW.value])
-
-
-def preprocess_image(image):
-    # Assuming input image is uint8
-    image = tf.image.convert_image_dtype(image, dtype=tf.float32)
-    return image * 2. - 1.
 
 
 def _activation_summary(x):
@@ -427,32 +422,15 @@ def loss(tgt_image, src_image_stack, intrinsics, pred_disp, pred_poses, pred_exp
 
         return total_loss
 
-    # # 计算batch的平均交叉熵损失
-    # labels = tf.cast(labels, tf.int64)
-    # cross_entropy = tf.nn.sparse_softmax_cross_entropy_with_logits(labels=labels, logits=logits,
-    #                                                                name='cross_entropy_per_example')
-    # cross_entropy_mean = tf.reduce_mean(cross_entropy, name='cross_entropy')
-    # tf.add_to_collection('losses', cross_entropy_mean)  # 交叉熵损失
-    #
-    # # The total loss is defined as the cross entropy loss plus all of the weight
-    # # decay terms (L2 loss).
-    # return tf.add_n(tf.get_collection('losses'), name='total_loss')
 
-
-def tower_loss(loader, scope):
+def tower_loss(tgt_image, src_image_stack, intrinsics, scope):
     """计算单卡上的损失值
     Args:
       scope: 指定显卡的唯一标识前缀, e.g. 'tower_0'
     Returns:
        Tensor of shape [] containing the total loss for a batch of data
     """
-    # 输入
-    with tf.name_scope("data_loading"):
-        tgt_image, src_image_stack, intrinsics = loader.load_train_batch()
-        tgt_image = preprocess_image(tgt_image)
-        src_image_stack = preprocess_image(src_image_stack)
 
-    # 过网络
 
     with tf.name_scope("depth_prediction"):
         pred_disp = disp_net(tgt_image, is_training=True)
@@ -528,17 +506,25 @@ def train():
 
         loader = DataLoader(FLAGS.dataset_dir, FLAGS.batch_size, FLAGS.img_height, FLAGS.img_width,
                             FLAGS.num_source, FLAGS.num_scales)
-        per_examples_in_an_epoch, num_train_examples, num_val_examples = loader.data_statistics()
+        num_of_batch_in_an_epoch, num_train_examples, num_val_examples = loader.data_statistics()
+        total_step = (FLAGS.num_epochs * num_of_batch_in_an_epoch) // FLAGS.num_gpus
+
+        num_step_in_an_epoch = num_of_batch_in_an_epoch // FLAGS.num_gpus
+
+
+        tgt_image, src_image_stack, intrinsics = loader.load_train_batch()
+        batch_queue = tf.contrib.slim.prefetch_queue.prefetch_queue(
+            [tgt_image, src_image_stack, intrinsics], capacity=2 * FLAGS.num_gpus)
         # 每个GPU分别计算梯度
         tower_grads = []
         with tf.variable_scope(tf.get_variable_scope()):
             for i in range(FLAGS.num_gpus):
                 with tf.device('/gpu:%d' % i):
                     with tf.name_scope('%s_%d' % (TOWER_NAME, i)) as scope:
-                        # Calculate the loss for one tower of the CIFAR model.
-                        # This function constructs the entire CIFAR model but
-                        # shares the variables across all towers.
-                        _loss = tower_loss(loader, scope)  # 计算损失,注意,数据的加载,预测值,损失计算都包含在其中
+
+                        tgt_image, src_image_stack, intrinsics = batch_queue.dequeue()
+                        # 计算损失,注意,数据的加载,预测值,损失计算都包含在其中
+                        _loss = tower_loss(tgt_image, src_image_stack, intrinsics, scope)
                         # Reuse variables for the next tower.
                         tf.get_variable_scope().reuse_variables()
                         # Retain the summaries from the final tower.
@@ -594,14 +580,14 @@ def train():
         threads = tf.train.start_queue_runners(sess=sess, coord=coord)
 
         summary_writer = tf.summary.FileWriter(FLAGS.checkpoint_dir, sess.graph)
-
+        print("Training in process...")
         try:
             step = 0
             # saver = tf.train.Saver([var for var in tf.model_variables()] + [global_step],max_to_keep=10)
             while not coord.should_stop():
                 start_time = time.time()
 
-                # 一步训练
+                # 一步训练=4 batch
                 _, loss_value = sess.run([train_op, _loss])
                 # 计算用时
                 duration = time.time() - start_time
@@ -609,25 +595,25 @@ def train():
                 assert not np.isnan(loss_value), 'Model diverged with loss = NaN'
 
                 # TensorBoard
-                if step % 10 == 0:
+                if step % 30 == 0:
                     summary_str = sess.run(summary_op)
                     summary_writer.add_summary(summary_str, step)
                 # 终端输出
-                if step % 100 == 0:
+                current_epoch = step * FLAGS.num_gpus // num_of_batch_in_an_epoch + 1
+                if step % (num_step_in_an_epoch // 10) == 0:
                     num_examples_per_step = FLAGS.batch_size * FLAGS.num_gpus
                     examples_per_sec = num_examples_per_step / duration
                     sec_per_batch = duration / FLAGS.num_gpus
-                    format_str = '%s: step %d, loss = %.2f (%.1f examples/sec; %.3f sec/batch)'
-                    print(format_str % (datetime.now(), step, loss_value, examples_per_sec, sec_per_batch))
+                    format_str = '%s: epoch = %3d, step=(%d/%d,%.3f%%), loss = %.2f (%.1f examples/sec; %.3f sec/batch)'
+                    print(format_str % (datetime.now(), current_epoch, step,
+                                        total_step,(step/total_step)*100, loss_value, examples_per_sec, sec_per_batch))
                 # 模型保存
-                if step % 1000 == 0:  # or (step + 1) == FLAGS.num_epochs * FLAGS.batch_size TODO :num_epochs
-                    print(" [*] Saving checkpoint to %s..." % FLAGS.checkpoint_dir)
+                if (step != 0) and (step % num_step_in_an_epoch == 0):  # an epoch is done
+                    print(" [*] %3dth epoch done! Saving latest checkpoint to %s..." % (current_epoch, FLAGS.checkpoint_dir))
                     saver.save(sess, os.path.join(FLAGS.checkpoint_dir, 'model'), global_step=step)
-                if step % FLAGS.save_latest_freq == 0:
-                    print(" [*] Saving checkpoint to %s..." % FLAGS.checkpoint_dir)
-                    saver.save(sess, os.path.join(FLAGS.checkpoint_dir, 'model.latest'))
-                if step >= FLAGS.num_epochs * per_examples_in_an_epoch //FLAGS.num_gpus:
+                if step * FLAGS.num_gpus >= FLAGS.num_epochs * num_of_batch_in_an_epoch:
                     print('Done training for %d epochs, %d steps.' % (FLAGS.num_epochs, step))
+                    saver.save(sess, os.path.join(FLAGS.checkpoint_dir, 'model.latest'))
                     coord.request_stop()
                 step += 1
                 #
@@ -643,160 +629,38 @@ def train():
     pass
 
 
+def build_pose_test_graph():
+    """
+    build pose net for test
+    :return: input placeholder and predicted poses
+    """
+    input_uint8 = tf.placeholder(tf.uint8, [FLAGS.batch_size, FLAGS.img_height, FLAGS.img_width * FLAGS.seq_length, 3],
+                                 name='raw_input')
+    input_mc = preprocess_image(input_uint8)
+    tgt_image, src_image_stack = batch_unpack_image_sequence(input_mc, FLAGS.img_height, FLAGS.img_width, FLAGS.num_source)
+    with tf.name_scope("pose_prediction"):
+        pred_poses, _ = pose_exp_net(tgt_image, src_image_stack, do_exp=False, is_training=False)
+    return input_uint8, pred_poses
+
+
+def build_depth_test_graph():
+    """
+    build depth net for test
+    :return:
+    """
+    input_uint8 = tf.placeholder(tf.uint8, [FLAGS.batch_size,FLAGS.img_height, FLAGS.img_width, 3], name='raw_input')
+    input_mc = preprocess_image(input_uint8)
+    with tf.name_scope("depth_prediction"):
+        pred_disp = disp_net(input_mc, is_training=False)
+        pred_depth = [1. / disp for disp in pred_disp]
+    pred_depth = pred_depth[0]
+    return input_uint8, pred_depth
+
+
 class EvisionNet(object):
     def __init__(self):
         pass
 
-    def build_train_graph(self):
-        opt = self.opt
-        loader = DataLoader(opt.dataset_dir,
-                            opt.batch_size,
-                            opt.img_height,
-                            opt.img_width,
-                            opt.num_source,
-                            opt.num_scales)
-        with tf.name_scope("data_loading"):
-            tgt_image, src_image_stack, intrinsics = loader.load_train_batch()
-            tgt_image = self.preprocess_image(tgt_image)
-            src_image_stack = self.preprocess_image(src_image_stack)
-
-        with tf.name_scope("depth_prediction"):
-            pred_disp = disp_net(tgt_image, is_training=True)
-            pred_depth = [1. / d for d in pred_disp]
-
-        with tf.name_scope("pose_and_explainability_prediction"):  # , pose_exp_net_endpoints
-            pred_poses, pred_exp_logits = pose_exp_net(tgt_image, src_image_stack,
-                                                       do_exp=(opt.explain_reg_weight > 0), is_training=True)
-
-        with tf.name_scope("compute_loss"):
-            pixel_loss = 0
-            exp_loss = 0
-            smooth_loss = 0
-            tgt_image_all = []
-            src_image_stack_all = []
-            proj_image_stack_all = []
-            proj_error_stack_all = []
-            exp_mask_stack_all = []
-            for s in range(opt.num_scales):
-                if opt.explain_reg_weight > 0:
-                    # Construct a reference explainability mask (i.e. all 
-                    # pixels are explainable)
-                    ref_exp_mask = self.get_reference_explain_mask(s)
-                # Scale the source and target images for computing loss at the 
-                # according scale.
-                curr_tgt_image = tf.image.resize_area(tgt_image,
-                                                      [int(opt.img_height / (2 ** s)), int(opt.img_width / (2 ** s))])
-                curr_src_image_stack = tf.image.resize_area(src_image_stack,
-                                                            [int(opt.img_height / (2 ** s)),
-                                                             int(opt.img_width / (2 ** s))])
-
-                if opt.smooth_weight > 0:
-                    smooth_loss += opt.smooth_weight / (2 ** s) * \
-                                   self.compute_smooth_loss(pred_disp[s])
-
-                for i in range(opt.num_source):
-                    # Inverse warp the source image to the target image frame
-                    curr_proj_image = projective_inverse_warp(
-                        curr_src_image_stack[:, :, :, 3 * i:3 * (i + 1)],
-                        tf.squeeze(pred_depth[s], axis=3),
-                        pred_poses[:, i, :],
-                        intrinsics[:, s, :, :])
-                    curr_proj_error = tf.abs(curr_proj_image - curr_tgt_image)
-                    # Cross-entropy loss as regularization for the 
-                    # explainability prediction
-                    if opt.explain_reg_weight > 0:
-                        curr_exp_logits = tf.slice(pred_exp_logits[s],
-                                                   [0, 0, 0, i * 2],
-                                                   [-1, -1, -1, 2])
-                        exp_loss += opt.explain_reg_weight * \
-                                    self.compute_exp_reg_loss(curr_exp_logits,
-                                                              ref_exp_mask)
-                        curr_exp = tf.nn.softmax(curr_exp_logits)
-                    # Photo-consistency loss weighted by explainability
-                    if opt.explain_reg_weight > 0:
-                        pixel_loss += tf.reduce_mean(curr_proj_error * \
-                                                     tf.expand_dims(curr_exp[:, :, :, 1], -1))
-                    else:
-                        pixel_loss += tf.reduce_mean(curr_proj_error)
-                        # Prepare images for tensorboard summaries
-                    if i == 0:
-                        proj_image_stack = curr_proj_image
-                        proj_error_stack = curr_proj_error
-                        if opt.explain_reg_weight > 0:
-                            exp_mask_stack = tf.expand_dims(curr_exp[:, :, :, 1], -1)
-                    else:
-                        proj_image_stack = tf.concat([proj_image_stack,
-                                                      curr_proj_image], axis=3)
-                        proj_error_stack = tf.concat([proj_error_stack,
-                                                      curr_proj_error], axis=3)
-                        if opt.explain_reg_weight > 0:
-                            exp_mask_stack = tf.concat([exp_mask_stack,
-                                                        tf.expand_dims(curr_exp[:, :, :, 1], -1)], axis=3)
-                tgt_image_all.append(curr_tgt_image)
-                src_image_stack_all.append(curr_src_image_stack)
-                proj_image_stack_all.append(proj_image_stack)
-                proj_error_stack_all.append(proj_error_stack)
-                if opt.explain_reg_weight > 0:
-                    exp_mask_stack_all.append(exp_mask_stack)
-            total_loss = pixel_loss + smooth_loss + exp_loss
-
-        with tf.name_scope("train_op"):
-            train_vars = [var for var in tf.trainable_variables()]
-            optim = tf.train.AdamOptimizer(opt.learning_rate, opt.beta1)
-            # self.grads_and_vars = optim.compute_gradients(total_loss, 
-            #                                               var_list=train_vars)
-            # self.train_op = optim.apply_gradients(self.grads_and_vars)
-            self.train_op = slim.learning.create_train_op(total_loss, optim)
-            self.global_step = tf.Variable(0,
-                                           name='global_step',
-                                           trainable=False)
-            self.incr_global_step = tf.assign(self.global_step,
-                                              self.global_step + 1)
-
-        # Collect tensors that are useful later (e.g. tf summary)
-        self.pred_depth = pred_depth
-        self.pred_poses = pred_poses
-        self.steps_per_epoch = loader.steps_per_epoch
-        self.total_loss = total_loss
-        self.pixel_loss = pixel_loss
-        self.exp_loss = exp_loss
-        self.smooth_loss = smooth_loss
-        self.tgt_image_all = tgt_image_all
-        self.src_image_stack_all = src_image_stack_all
-        self.proj_image_stack_all = proj_image_stack_all
-        self.proj_error_stack_all = proj_error_stack_all
-        self.exp_mask_stack_all = exp_mask_stack_all
-
-    def get_reference_explain_mask(self, downscaling):
-        opt = self.opt
-        tmp = np.array([0, 1])
-        ref_exp_mask = np.tile(tmp,
-                               (opt.batch_size,
-                                int(opt.img_height / (2 ** downscaling)),
-                                int(opt.img_width / (2 ** downscaling)),
-                                1))
-        ref_exp_mask = tf.constant(ref_exp_mask, dtype=tf.float32)
-        return ref_exp_mask
-
-    def compute_exp_reg_loss(self, pred, ref):
-        l = tf.nn.softmax_cross_entropy_with_logits(
-            labels=tf.reshape(ref, [-1, 2]),
-            logits=tf.reshape(pred, [-1, 2]))
-        return tf.reduce_mean(l)
-
-    def compute_smooth_loss(self, pred_disp):
-        def gradient(pred):
-            D_dy = pred[:, 1:, :, :] - pred[:, :-1, :, :]
-            D_dx = pred[:, :, 1:, :] - pred[:, :, :-1, :]
-            return D_dx, D_dy
-
-        dx, dy = gradient(pred_disp)
-        dx2, dxdy = gradient(dx)
-        dydx, dy2 = gradient(dy)
-        return tf.reduce_mean(tf.abs(dx2)) + \
-               tf.reduce_mean(tf.abs(dxdy)) + \
-               tf.reduce_mean(tf.abs(dydx)) + \
-               tf.reduce_mean(tf.abs(dy2))
 
     def collect_summaries(self):
         opt = self.opt
@@ -834,133 +698,11 @@ class EvisionNet(object):
         # for grad, var in self.grads_and_vars:
         #     tf.summary.histogram(var.op.name + "/gradients", grad)
 
-    def train(self, opt):
-        opt.num_source = opt.seq_length - 1
-        # TODO: currently fixed to 4
-        opt.num_scales = 4
-        self.opt = opt
-        self.build_train_graph()
-        self.collect_summaries()
-        with tf.name_scope("parameter_count"):
-            parameter_count = tf.reduce_sum([tf.reduce_prod(tf.shape(v)) \
-                                             for v in tf.trainable_variables()])
-        self.saver = tf.train.Saver([var for var in tf.model_variables()] + \
-                                    [self.global_step],
-                                    max_to_keep=10)
-        sv = tf.train.Supervisor(logdir=opt.checkpoint_dir,
-                                 save_summaries_secs=0,
-                                 saver=None)
-        config = tf.ConfigProto()
-        config.gpu_options.allow_growth = True
-        with sv.managed_session(config=config) as sess:
-            print('Trainable variables: ')
-            for var in tf.trainable_variables():
-                print(var.name)
-            print("parameter_count =", sess.run(parameter_count))
-            if opt.continue_train:
-                if opt.init_checkpoint_file is None:
-                    checkpoint = tf.train.latest_checkpoint(opt.checkpoint_dir)
-                else:
-                    checkpoint = opt.init_checkpoint_file
-                print("Resume training from previous checkpoint: %s" % checkpoint)
-                self.saver.restore(sess, checkpoint)
-            start_time = time.time()
-            for step in range(1, opt.max_steps):
-                fetches = {
-                    "train": self.train_op,
-                    "global_step": self.global_step,
-                    "incr_global_step": self.incr_global_step
-                }
-
-                if step % opt.summary_freq == 0:
-                    fetches["loss"] = self.total_loss
-                    fetches["summary"] = sv.summary_op
-
-                results = sess.run(fetches)
-                gs = results["global_step"]
-
-                if step % opt.summary_freq == 0:
-                    sv.summary_writer.add_summary(results["summary"], gs)
-                    train_epoch = math.ceil(gs / self.steps_per_epoch)
-                    train_step = gs - (train_epoch - 1) * self.steps_per_epoch
-                    print("Epoch: [%2d] [%5d/%5d] time: %4.4f/it loss: %.3f" \
-                          % (train_epoch, train_step, self.steps_per_epoch, \
-                             (time.time() - start_time) / opt.summary_freq,
-                             results["loss"]))
-                    start_time = time.time()
-
-                if step % opt.save_latest_freq == 0:
-                    self.save(sess, opt.checkpoint_dir, 'latest')
-
-                if step % self.steps_per_epoch == 0:
-                    self.save(sess, opt.checkpoint_dir, gs)
-
-    def build_depth_test_graph(self):
-        input_uint8 = tf.placeholder(tf.uint8, [self.batch_size,
-                                                self.img_height, self.img_width, 3], name='raw_input')
-        input_mc = self.preprocess_image(input_uint8)
-        with tf.name_scope("depth_prediction"):
-            pred_disp, depth_net_endpoints = disp_net(
-                input_mc, is_training=False)
-            pred_depth = [1. / disp for disp in pred_disp]
-        pred_depth = pred_depth[0]
-        self.inputs = input_uint8
-        self.pred_depth = pred_depth
-        self.depth_epts = depth_net_endpoints
-
-    def build_pose_test_graph(self):
-        input_uint8 = tf.placeholder(tf.uint8, [self.batch_size, self.img_height, self.img_width * self.seq_length, 3],
-                                     name='raw_input')
-        input_mc = self.preprocess_image(input_uint8)
-        loader = DataLoader()
-        tgt_image, src_image_stack = loader.batch_unpack_image_sequence(
-            input_mc, self.img_height, self.img_width, self.num_source)
-        with tf.name_scope("pose_prediction"):
-            pred_poses, _ = pose_exp_net(tgt_image, src_image_stack, do_exp=False, is_training=False)
-            self.inputs = input_uint8
-            self.pred_poses = pred_poses
-
-    def preprocess_image(self, image):
-        # Assuming input image is uint8
-        image = tf.image.convert_image_dtype(image, dtype=tf.float32)
-        return image * 2. - 1.
 
     def deprocess_image(self, image):
         # Assuming input image is float32
         image = (image + 1.) / 2.
         return tf.image.convert_image_dtype(image, dtype=tf.uint8)
-
-    def setup_inference(self, img_height, img_width, mode, seq_length=3, batch_size=1):
-        self.img_height = img_height
-        self.img_width = img_width
-        self.mode = mode
-        self.batch_size = batch_size
-        if self.mode == 'depth':
-            self.build_depth_test_graph()
-        if self.mode == 'pose':
-            self.seq_length = seq_length
-            self.num_source = seq_length - 1
-            self.build_pose_test_graph()
-
-    def inference(self, inputs, sess, mode='depth'):
-        fetches = {}
-        if mode == 'depth':
-            fetches['depth'] = self.pred_depth
-        if mode == 'pose':
-            fetches['pose'] = self.pred_poses
-        results = sess.run(fetches, feed_dict={self.inputs: inputs})
-        return results
-
-    def save(self, sess, checkpoint_dir, step):
-        model_name = 'model'
-        print(" [*] Saving checkpoint to %s..." % checkpoint_dir)
-        if step == 'latest':
-            self.saver.save(sess,
-                            os.path.join(checkpoint_dir, model_name + '.latest'))
-        else:
-            self.saver.save(sess,
-                            os.path.join(checkpoint_dir, model_name),
-                            global_step=step)
 
 
 def model_train_all():
@@ -978,8 +720,6 @@ def model_train_all():
         for file in os.listdir(FLAGS.checkpoint_dir):
             os.remove(os.path.join(FLAGS.checkpoint_dir, file))
     train()
-    # sfm = EvisionNet()
-    # sfm.train(FLAGS)
 
 
 def model_test_depth():
@@ -989,12 +729,13 @@ def model_test_depth():
         test_files = f.readlines()
         test_files = [FLAGS.dataset_dir + t[:-1] for t in test_files]
     basename = os.path.basename(ckpt_name)
-    sfm = EvisionNet()
-    sfm.setup_inference(img_height=FLAGS.img_height,
-                        img_width=FLAGS.img_width,
-                        batch_size=FLAGS.batch_size,
-                        mode='depth')
-    saver = tf.train.Saver([var for var in tf.model_variables()])
+
+
+    input_image,pred_depth = build_depth_test_graph()
+    fetches = {}
+    fetches['depth'] = pred_depth
+
+    saver = tf.train.Saver([var for var in tf.trainable_variables()])
     config = tf.ConfigProto()
     config.gpu_options.allow_growth = True
     with tf.Session(config=config) as sess:
@@ -1016,7 +757,7 @@ def model_test_depth():
                 inputs[b] = np.array(scaled_im)
                 # im = scipy.misc.imread(test_files[idx])
                 # inputs[b] = scipy.misc.imresize(im, (FLAGS.img_height, FLAGS.img_width))
-            pred = sfm.inference(inputs, sess, mode='depth')
+            pred = sess.run(fetches, feed_dict={input_image: inputs})
             for b in range(FLAGS.batch_size):
                 idx = t + b
                 if idx >= len(test_files):
@@ -1046,12 +787,10 @@ def model_test_pose():
     pose_gt_file = os.path.join(FLAGS.dataset_dir, 'poses', '%.2d.txt' % FLAGS.test_seq)
 
     # 把原有的12参数变更为8参数,存储成all.txt
+    input_image, pred_poses = build_pose_test_graph()
+    fetches = {}
+    fetches['pose'] = pred_poses
 
-    sfm = EvisionNet()
-    sfm.setup_inference(img_height=FLAGS.img_height,
-                        img_width=FLAGS.img_width,
-                        mode='pose',
-                        seq_length=FLAGS.seq_length)
     saver = tf.train.Saver([var for var in tf.trainable_variables()])
 
     seq_dir = os.path.join(FLAGS.dataset_dir, 'sequences', '%.2d' % FLAGS.test_seq)
@@ -1089,7 +828,8 @@ def model_test_pose():
                                             FLAGS.seq_length,
                                             FLAGS.img_height,
                                             FLAGS.img_width)
-            pred = sfm.inference(image_seq[None, :, :, :], sess, mode='pose')
+
+            pred = sess.run(fetches, feed_dict={input_image: image_seq[None, :, :, :]})
             pred_poses = pred['pose'][0]
             # Insert the target pose [0, 0, 0, 0, 0, 0]
             pred_poses = np.insert(pred_poses, max_src_offset, np.zeros((1, 6)), axis=0)
