@@ -550,6 +550,7 @@ def train():
         # 应用梯度
         train_op = opt.apply_gradients(grads, global_step=global_step)
 
+
         # 可训练变量的曲线图
 
         for var in tf.trainable_variables():
@@ -611,6 +612,7 @@ def train():
                 if (step != 0) and (step % num_step_in_an_epoch == 0):  # an epoch is done
                     print(" [*] %3dth epoch done! Saving latest checkpoint to %s..." % (current_epoch, FLAGS.checkpoint_dir))
                     saver.save(sess, os.path.join(FLAGS.checkpoint_dir, 'model'), global_step=step)
+
                 if step * FLAGS.num_gpus >= FLAGS.num_epochs * num_of_batch_in_an_epoch:
                     print('Done training for %d epochs, %d steps.' % (FLAGS.num_epochs, step))
                     saver.save(sess, os.path.join(FLAGS.checkpoint_dir, 'model.latest'))
@@ -784,15 +786,11 @@ def model_test_pose():
     if not os.path.isdir(FLAGS.output_dir):
         os.makedirs(FLAGS.output_dir)
 
-    pose_gt_file = os.path.join(FLAGS.dataset_dir, 'poses', '%.2d.txt' % FLAGS.test_seq)
-
-    # 把原有的12参数变更为8参数,存储成all.txt
     input_image, pred_poses = build_pose_test_graph()
     fetches = {}
     fetches['pose'] = pred_poses
 
-    saver = tf.train.Saver([var for var in tf.trainable_variables()])
-
+    # 把原有的12参数变更为8参数,存储成all.txt
     seq_dir = os.path.join(FLAGS.dataset_dir, 'sequences', '%.2d' % FLAGS.test_seq)
     img_dir = os.path.join(seq_dir, 'image_2')
     N = len(glob(img_dir + '/*.png'))
@@ -803,8 +801,9 @@ def model_test_pose():
 
     times = np.array([float(s[:-1]) for s in times])
     output_file_name = FLAGS.output_dir + '/%.2d' % FLAGS.test_seq + "_pose_gt_all.txt"
-
+    pose_gt_file = os.path.join(FLAGS.dataset_dir, 'poses', '%.2d.txt' % FLAGS.test_seq)
     Odometry_12params_to_8params(pose_gt_file, times, output_file_name)
+
     groundTruthPath = FLAGS.output_dir + "/GroundTruth/"
     if not os.path.isdir(groundTruthPath):
         os.makedirs(groundTruthPath)
@@ -814,6 +813,7 @@ def model_test_pose():
     max_src_offset = (FLAGS.seq_length - 1) // 2
     ckpt_name = find_latest_ckpt(FLAGS.checkpoint_dir)
     ckpt_abs_file_path = os.path.join(FLAGS.checkpoint_dir, ckpt_name)
+    saver = tf.train.Saver([var for var in tf.trainable_variables()])
     with tf.Session() as sess:
         saver.restore(sess, ckpt_abs_file_path)
         for tgt_idx in range(N):
@@ -841,8 +841,36 @@ def model_test_pose():
 
             out_file = predictionPath + '/%.6d.txt' % (tgt_idx - max_src_offset)
 
-            dump_pose_seq_TUM(out_file, pred_poses, curr_times)
-    evaluate_pose(predictionPath, groundTruthPath)
+            #dump_pose_seq_TUM(out_file, pred_poses, curr_times)
+            # First frame as the origin
+            #(out_file, poses, times)
+            first_pose = pose_vec_to_mat(pred_poses[0])
+            with open(out_file, 'w') as f:
+                for p in range(len(curr_times)):
+                    this_pose = pose_vec_to_mat(pred_poses[p])
+                    this_pose = np.dot(first_pose, np.linalg.inv(this_pose))
+                    tx = this_pose[0, 3]
+                    ty = this_pose[1, 3]
+                    tz = this_pose[2, 3]
+                    rot = this_pose[:3, :3]
+                    qw, qx, qy, qz = rot2quat(rot)
+                    f.write('%f %f %f %f %f %f %f %f\n' % (curr_times[p], tx, ty, tz, qx, qy, qz, qw))
+    # evaluate_pose(predictionPath, groundTruthPath)
+
+    pred_files = glob(predictionPath + '/*.txt')
+    ate_all = []
+    for i in range(len(pred_files)):
+        gtruth_file = groundTruthPath + os.path.basename(pred_files[i])
+        if not os.path.exists(gtruth_file):
+            continue
+        ate = compute_ate(gtruth_file, pred_files[i])
+        if ate == False:
+            continue
+        ate_all.append(ate)
+    ate_all = np.array(ate_all)
+    print("Predictions dir: %s" % predictionPath)
+    print("ATE(Absolute Trajectory Error,绝对轨迹误差) mean: %.4f, std: %.4f" % (np.mean(ate_all), np.std(ate_all)))
+
     pass
 
 
