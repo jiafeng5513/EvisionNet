@@ -49,3 +49,31 @@ EvisonNet
 [14]. [Unsupervised Learning of Depth and Ego-Motion解析](https://zhuanlan.zhihu.com/p/50544334).<br>
 [15]. [视觉里程计 第二部分：匹配、鲁棒、优化和应用](https://blog.csdn.net/cicibabe/article/details/70260936).<br>
 [16]. [怎样通过照片获得高质量3D模型](https://zhuanlan.zhihu.com/p/24137374).<br>
+
+### 6.性能记录
+1. test_depth
+
+| Abs Rel | Sq Rel | RMSE  | RMSE(log) | Acc.1 | Acc.2 | Acc.3 |
+|---------|--------|-------|-----------|-------|-------|-------|
+| 0.183   | 1.595  | 6.709 | 0.270     | 0.734 | 0.902 | 0.959 | 
+
+2. test_pose
+
+| Seq. 09            | Seq. 10            |
+|--------------------|--------------------|
+| 0.016 (std. 0.009) | 0.013 (std. 0.009) |
+
+### 7.评价指标说明
+1. 深度指标:
+
+$abs\_rel=Mean(\left |\frac{gt-pred}{gt}\right|)$<br>
+$sq\_rel=Mean(\frac{(gt-pred)^{2}}{gt})$ <br>
+$rms=\sqrt{Mean((gt-pred)^{2})}$<br>
+$log\_rms=\sqrt{Mean([(log(gt)-log(pred)]^{2})}$<br>
+$a1=Mean((thresh<1.25))$<br>
+$a2=Mean((thresh<1.25^{2}))$<br>
+$a3=Mean((thresh<1.25^{3}))$<br>
+$thresh=np.maximum((\frac{gt}{pred}), (\frac{pred}{ gt}))$<br>
+
+2. ego-motion指标:
+ATE(Absolute Trajectory Error,绝对轨迹误差)在测试集上的均值和标准差.<br>
