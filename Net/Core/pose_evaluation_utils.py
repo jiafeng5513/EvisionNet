@@ -3,8 +3,15 @@
 
 import math
 import numpy as np
+import PIL.Image as pil
+import scipy.misc
+import math
+import os
+import functools
+
 
 def compute_ate(gtruth_file, pred_file):
+    #
     gtruth_list = read_file_list(gtruth_file)
     pred_list = read_file_list(pred_file)
     matches = associate(gtruth_list, pred_list, 0, 0.01)
@@ -24,6 +31,28 @@ def compute_ate(gtruth_file, pred_file):
     scale = np.sum(gtruth_xyz * pred_xyz)/np.sum(pred_xyz ** 2)
     alignment_error = pred_xyz * scale - gtruth_xyz
     rmse = np.sqrt(np.sum(alignment_error ** 2))/len(matches)
+    return rmse
+
+
+def compute_ate2(gtruth_list, pred_list):
+    #
+    matches = associate(gtruth_list, pred_list, 0, 0.01)
+    if len(matches) < 2:
+        return False
+
+    gtruth_xyz = np.array([[float(value) for value in gtruth_list[a][0:3]] for a, b in matches])
+    pred_xyz = np.array([[float(value) for value in pred_list[b][0:3]] for a, b in matches])
+
+    # Make sure that the first matched frames align (no need for rotational alignment as
+    # all the predicted/ground-truth snippets have been converted to use the same coordinate
+    # system with the first frame of the snippet being the origin).
+    offset = gtruth_xyz[0] - pred_xyz[0]
+    pred_xyz += offset[None, :]
+
+    # Optimize the scaling factor
+    scale = np.sum(gtruth_xyz * pred_xyz) / np.sum(pred_xyz ** 2)
+    alignment_error = pred_xyz * scale - gtruth_xyz
+    rmse = np.sqrt(np.sum(alignment_error ** 2)) / len(matches)
     return rmse
 
 def read_file_list(filename):
@@ -47,6 +76,7 @@ def read_file_list(filename):
     list = [[v.strip() for v in line.split(" ") if v.strip()!=""] for line in lines if len(line)>0 and line[0]!="#"]
     list = [(float(l[0]),l[1:]) for l in list if len(l)>1]
     return dict(list)
+
 
 def associate(first_list, second_list,offset,max_difference):
     """
@@ -80,10 +110,12 @@ def associate(first_list, second_list,offset,max_difference):
     matches.sort()
     return matches
 
+
 def rot2quat(R):
     rz, ry, rx = mat2euler(R)
     qw, qx, qy, qz = euler2quat(rz, ry, rx)
     return qw, qx, qy, qz
+
 
 def quat2mat(q):
     ''' Calculate rotation matrix corresponding to quaternion
@@ -133,6 +165,7 @@ def quat2mat(q):
            [[ 1.0-(yY+zZ), xY-wZ, xZ+wY ],
             [ xY+wZ, 1.0-(xX+zZ), yZ-wX ],
             [ xZ-wY, yZ+wX, 1.0-(xX+yY) ]])
+
 
 def mat2euler(M, cy_thresh=None, seq='zyx'):
     '''
@@ -214,7 +247,7 @@ def mat2euler(M, cy_thresh=None, seq='zyx'):
         raise Exception('Sequence not recognized')
     return z, y, x
 
-import functools
+
 def euler2mat(z=0, y=0, x=0, isRadian=True):
     ''' Return matrix for rotations around z, y and x axes
     Uses the z, then y, then x convention above
@@ -310,6 +343,7 @@ def euler2mat(z=0, y=0, x=0, isRadian=True):
             return functools.reduce(np.dot, Ms[::-1])
     return np.eye(3)
 
+
 def euler2quat(z=0, y=0, x=0, isRadian=True):
     ''' Return quaternion corresponding to these Euler angles
     Uses the z, then y, then x convention above
@@ -357,6 +391,7 @@ def euler2quat(z=0, y=0, x=0, isRadian=True):
                      cx*cz*sy - sx*cy*sz,
                      cx*cy*sz + sx*cz*sy])
 
+
 def pose_vec_to_mat(vec):
     tx = vec[0]
     ty = vec[1]
@@ -367,6 +402,7 @@ def pose_vec_to_mat(vec):
     hfiller = np.array([0, 0, 0, 1]).reshape((1,4))
     Tmat = np.concatenate((Tmat, hfiller), axis=0)
     return Tmat
+
 
 def dump_pose_seq_TUM(out_file, poses, times):
     # First frame as the origin
@@ -384,6 +420,7 @@ def dump_pose_seq_TUM(out_file, poses, times):
 
 
 def Odometry_12params_to_8params(input_file_name, times, output_file_name):
+    GT_8params_list = []
     with open(input_file_name, 'r') as f_in:
         Odometry_12params_lines = f_in.readlines()
         with open(output_file_name, 'w') as f_out:
@@ -397,9 +434,10 @@ def Odometry_12params_to_8params(input_file_name, times, output_file_name):
                 ty = params_12_mat[1, 3]
                 tz = params_12_mat[2, 3]
                 rot = params_12_mat[:3, :3]
-
                 qw, qx, qy, qz = rot2quat(rot)
+                GT_8params_list.append([time, tx, ty, tz, qx, qy, qz, qw])
                 f_out.write('%f %f %f %f %f %f %f %f\n' % (time, tx, ty, tz, qx, qy, qz, qw))
+    return GT_8params_list
     pass
 
 
@@ -413,3 +451,35 @@ def create_8params_gtfiles(input_file_name,output_file_path,seq_length):
                 for j in range(seq_length):
                     f_out.writelines(full_lines[i+j])
     pass
+
+
+def load_image_sequence(dataset_dir, frames, tgt_idx, seq_length, img_height, img_width):
+    half_offset = int((seq_length - 1) / 2)
+    for o in range(-half_offset, half_offset + 1):
+        curr_idx = tgt_idx + o
+        curr_drive, curr_frame_id = frames[curr_idx].split(' ')
+        img_file = os.path.join(
+            dataset_dir, 'sequences', '%s/image_2/%s.png' % (curr_drive, curr_frame_id))
+        curr_img = scipy.misc.imread(img_file)
+        curr_img = scipy.misc.imresize(curr_img, (img_height, img_width))
+        if o == -half_offset:
+            image_seq = curr_img
+        else:
+            image_seq = np.hstack((image_seq, curr_img))
+    return image_seq
+
+
+def is_valid_sample(frames, tgt_idx, seq_length):
+    N = len(frames)
+    tgt_drive, _ = frames[tgt_idx].split(' ')
+    max_src_offset = int((seq_length - 1) / 2)
+    min_src_idx = tgt_idx - max_src_offset
+    max_src_idx = tgt_idx + max_src_offset
+    if min_src_idx < 0 or max_src_idx >= N:
+        return False
+    # TODO: unnecessary to check if the drives match
+    min_src_drive, _ = frames[min_src_idx].split(' ')
+    max_src_drive, _ = frames[max_src_idx].split(' ')
+    if tgt_drive == min_src_drive and tgt_drive == max_src_drive:
+        return True
+    return False

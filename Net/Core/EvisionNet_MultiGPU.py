@@ -278,38 +278,6 @@ def disp_net(tgt_image, is_training=True):
         return [disp1, disp2, disp3, disp4]
 
 
-def load_image_sequence(dataset_dir, frames, tgt_idx, seq_length, img_height, img_width):
-    half_offset = int((seq_length - 1) / 2)
-    for o in range(-half_offset, half_offset + 1):
-        curr_idx = tgt_idx + o
-        curr_drive, curr_frame_id = frames[curr_idx].split(' ')
-        img_file = os.path.join(
-            dataset_dir, 'sequences', '%s/image_2/%s.png' % (curr_drive, curr_frame_id))
-        curr_img = scipy.misc.imread(img_file)
-        curr_img = scipy.misc.imresize(curr_img, (img_height, img_width))
-        if o == -half_offset:
-            image_seq = curr_img
-        else:
-            image_seq = np.hstack((image_seq, curr_img))
-    return image_seq
-
-
-def is_valid_sample(frames, tgt_idx, seq_length):
-    N = len(frames)
-    tgt_drive, _ = frames[tgt_idx].split(' ')
-    max_src_offset = int((seq_length - 1) / 2)
-    min_src_idx = tgt_idx - max_src_offset
-    max_src_idx = tgt_idx + max_src_offset
-    if min_src_idx < 0 or max_src_idx >= N:
-        return False
-    # TODO: unnecessary to check if the drives match
-    min_src_drive, _ = frames[min_src_idx].split(' ')
-    max_src_drive, _ = frames[max_src_idx].split(' ')
-    if tgt_drive == min_src_drive and tgt_drive == max_src_drive:
-        return True
-    return False
-
-
 def get_reference_explain_mask(downscaling):
     tmp = np.array([0, 1])
     ref_exp_mask = np.tile(tmp, (FLAGS.batch_size, int(FLAGS.img_height / (2 ** downscaling)),
@@ -781,6 +749,11 @@ def model_test_pose():
     4. 连接图片,进入网络进行测试
     5. 把测试结果存储成一系列文件
     6. 对比这些文件,得到测试结果
+    这里需要注意的是,每次我们输入sequence_length张图片进入网络,网络会把第一张图作为初始位置,
+    但是在GT中,整个序列上千张图片都是连续的,所以直接比较某张图的pose是没有意义的
+    比如输入345这三张图,得到p1,p2,p3,
+    在GT中,对应的三张图的pose是P1,P2,P3,
+    我们要做的其实是:计算p1,p2之间的运动,和P1,P2之间的情况作比较
     :return:
     """
     if not os.path.isdir(FLAGS.output_dir):
@@ -793,16 +766,20 @@ def model_test_pose():
     # 把原有的12参数变更为8参数,存储成all.txt
     seq_dir = os.path.join(FLAGS.dataset_dir, 'sequences', '%.2d' % FLAGS.test_seq)
     img_dir = os.path.join(seq_dir, 'image_2')
-    N = len(glob(img_dir + '/*.png'))
-    test_frames = ['%.2d %.6d' % (FLAGS.test_seq, n) for n in range(N)]  # 000000~N
+    N = len(glob(img_dir + '/*.png'))  # 这样直接读取的文件名是乱序的,我们只用文件数量
+    test_frames = ['%.2d %.6d' % (FLAGS.test_seq, n) for n in range(N)]  # 000000~N,生成按顺序的图片文件名列表
 
+    # 读取测试序列对应的times
     with open(FLAGS.dataset_dir + 'sequences/%.2d/times.txt' % FLAGS.test_seq, 'r') as f:
-        times = f.readlines()
+        times_strs = f.readlines()
+        times = np.array([float(s[:-1]) for s in times_strs])
 
-    times = np.array([float(s[:-1]) for s in times])
     output_file_name = FLAGS.output_dir + '/%.2d' % FLAGS.test_seq + "_pose_gt_all.txt"
     pose_gt_file = os.path.join(FLAGS.dataset_dir, 'poses', '%.2d.txt' % FLAGS.test_seq)
-    Odometry_12params_to_8params(pose_gt_file, times, output_file_name)
+
+    # 创建8参数ground truth 列表 尺寸[N][8],N为该序列的图片数,8依次为:
+    # [时间 Tx Ty Tz Qx Qy Qz Qw],其中(Tx Ty Tz)是表示平移的向量,(Qx Qy Qz Qw)是表示旋转的四元数
+    GT_8params_list = Odometry_12params_to_8params(pose_gt_file, times, output_file_name)
 
     groundTruthPath = FLAGS.output_dir + "/GroundTruth/"
     if not os.path.isdir(groundTruthPath):
@@ -841,12 +818,18 @@ def model_test_pose():
 
             out_file = predictionPath + '/%.6d.txt' % (tgt_idx - max_src_offset)
 
+            predictions_list = []  # [N,FLAGS.seq_length,8],N为测试序列的图片数量,
+                                   # FLAGS.seq_length为一个样本中有几张图片
+                                   # 8为每条数据的8个参数
+            single_sample = []     # [FLAGS.seq_length,8],单个样本
+
             #dump_pose_seq_TUM(out_file, pred_poses, curr_times)
             # First frame as the origin
             #(out_file, poses, times)
             first_pose = pose_vec_to_mat(pred_poses[0])
             with open(out_file, 'w') as f:
                 for p in range(len(curr_times)):
+                    single_sample = []
                     this_pose = pose_vec_to_mat(pred_poses[p])
                     this_pose = np.dot(first_pose, np.linalg.inv(this_pose))
                     tx = this_pose[0, 3]
@@ -854,19 +837,39 @@ def model_test_pose():
                     tz = this_pose[2, 3]
                     rot = this_pose[:3, :3]
                     qw, qx, qy, qz = rot2quat(rot)
+                    single_sample.append([curr_times[p], tx, ty, tz, qx, qy, qz, qw])
                     f.write('%f %f %f %f %f %f %f %f\n' % (curr_times[p], tx, ty, tz, qx, qy, qz, qw))
+                predictions_list.append(single_sample)
     # evaluate_pose(predictionPath, groundTruthPath)
 
     pred_files = glob(predictionPath + '/*.txt')
     ate_all = []
-    for i in range(len(pred_files)):
-        gtruth_file = groundTruthPath + os.path.basename(pred_files[i])
-        if not os.path.exists(gtruth_file):
-            continue
-        ate = compute_ate(gtruth_file, pred_files[i])
+
+    # 从GT_8params_list中取出对应的FLAGS.seq_length条数据
+    # 读取对应的predictions_list中的FLAGS.seq_length条数据
+    # 把上述两种数据都转换为字典,key是时间戳,value是后面七个值
+    # 传入compute_ate2进行计算
+    for i in range(len(predictions_list)):
+        gt_sample = {}
+        pred_sample = {}
+        for j in range(FLAGS.seq_length):
+            gt_sample[GT_8params_list[i+j][0]] = GT_8params_list[i+j][1:]
+            pred_sample[predictions_list[i][j][0]] = predictions_list[i][j][1:]
+        ate = compute_ate2(gt_sample, pred_sample)
         if ate == False:
             continue
         ate_all.append(ate)
+        pass
+
+
+    # for i in range(len(pred_files)):
+    #     gtruth_file = groundTruthPath + os.path.basename(pred_files[i])
+    #     if not os.path.exists(gtruth_file):
+    #         continue
+    #     ate = compute_ate(gtruth_file, pred_files[i])
+    #     if ate == False:
+    #         continue
+    #     ate_all.append(ate)
     ate_all = np.array(ate_all)
     print("Predictions dir: %s" % predictionPath)
     print("ATE(Absolute Trajectory Error,绝对轨迹误差) mean: %.4f, std: %.4f" % (np.mean(ate_all), np.std(ate_all)))

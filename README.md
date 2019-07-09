@@ -51,16 +51,6 @@ EvisonNet
 [16]. [怎样通过照片获得高质量3D模型](https://zhuanlan.zhihu.com/p/24137374).<br>
 
 ### 6.性能记录
-1. test_depth
-
-|epoch|lr   |adam mon|smooth_weight|explain_reg_weight|batch_size|num GPU| seq 09| seq 10|
-|:---:|:---:|:------:|:-----------:|:----------------:|:--------:|:-----:|:----------:|:----------:|
-
-| Abs Rel | Sq Rel | RMSE  | RMSE(log) | Acc.1 | Acc.2 | Acc.3 |
-|---------|--------|-------|-----------|-------|-------|-------|
-| 0.183   | 1.595  | 6.709 | 0.270     | 0.734 | 0.902 | 0.959 | 
-
-2. test_pose
 
 |epoch|lr   |momentum|W_smooth|W_explain|batch size|seq 09|seq 10|Abs Rel|Sq Rel|rms|log_rms|A1|A2|A3|
 |:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
