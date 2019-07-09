@@ -24,8 +24,8 @@ MIN_DISP = 0.01
 TOWER_NAME = 'tower'
 
 flags = tf.app.flags
-flags.DEFINE_integer("run_mode", 0, "0=train,1=test_depth,2=test_pose")
-flags.DEFINE_string("dataset_dir", "/home/RAID1/DataSet/KITTI/KittiRaw_prepared/", "数据位置")
+flags.DEFINE_integer("run_mode", 2, "0=train,1=test_depth,2=test_pose")
+flags.DEFINE_string("dataset_dir", "/home/RAID1/DataSet/KITTI/KittiOdometry/", "数据位置")
 # KittiOdometry,KittiOdometry_prepared,KittiRaw,KittiRaw_prepared
 
 # test pose  : KittiOdometry     /home/RAID1/DataSet/KITTI/KittiOdometry/
@@ -42,7 +42,7 @@ flags.DEFINE_float("learning_rate", 0.0002, "学习率")
 flags.DEFINE_float("beta1", 0.9, "adam动量参数")
 flags.DEFINE_float("smooth_weight", 0.5, "平滑的权重")
 flags.DEFINE_float("explain_reg_weight", 0.2, "Weight for explanability regularization")
-flags.DEFINE_integer("batch_size", 16, "batch size")
+flags.DEFINE_integer("batch_size", 1, "batch size")
 flags.DEFINE_integer("img_height", 128, "Image height")
 flags.DEFINE_integer("img_width", 416, "Image width")
 flags.DEFINE_integer("seq_length", 3, "一个样本中含有几张图片")
@@ -50,7 +50,7 @@ flags.DEFINE_integer("num_source", 2, "一个样本中有几个是source images,
 flags.DEFINE_integer("max_steps", 200000, "训练迭代次数")
 flags.DEFINE_integer("summary_freq", 100, "summary频率,单位:batch*num_gpus")
 flags.DEFINE_integer("save_freq", 1000, "保存频率,单位:batch*num_gpus")
-flags.DEFINE_integer('num_gpus', 4, "使用多少GPU")
+flags.DEFINE_integer('num_gpus', 3, "使用多少GPU")
 flags.DEFINE_integer('num_epochs', 30, "把整个训练集训练多少次")
 # params for model_test_depth
 flags.DEFINE_string("test_file_list", '../data/kitti/test_files_eigen.txt', "Path to the list of test files")
@@ -59,13 +59,14 @@ flags.DEFINE_float("max_depth", 80, "Threshold for maximum depth")
 
 # params for model_test_pose
 flags.DEFINE_integer("test_seq", 9, "使用KittiOdometry的哪个序列进行测试")  # pick from 22 sequences in KittiOdometry
-flags.DEFINE_string("output_dir", "./test_output/test_pose/", "Output directory")
+flags.DEFINE_string("output_dir", "../test_output/test_pose/", "Output directory")
 
 # add by jiafeng5513,followed by https://github.com/tinghuiz/SfMLearner/pull/70
 flags.DEFINE_integer("num_scales", 4, "number of used image scales")
 
 FLAGS = flags.FLAGS
 
+GPU_ID = [1,2,3]  # 0,1,2,3
 
 def resize_like(inputs, ref):
     iH, iW = inputs.get_shape()[1], inputs.get_shape()[2]
@@ -486,7 +487,8 @@ def train():
         # 每个GPU分别计算梯度
         tower_grads = []
         with tf.variable_scope(tf.get_variable_scope()):
-            for i in range(FLAGS.num_gpus):
+            #for i in range(FLAGS.num_gpus):
+            for i in GPU_ID:
                 with tf.device('/gpu:%d' % i):
                     with tf.name_scope('%s_%d' % (TOWER_NAME, i)) as scope:
 
@@ -895,3 +897,4 @@ def main(_):
 
 if __name__ == '__main__':
     tf.app.run()
+   # print(get_available_gpus())

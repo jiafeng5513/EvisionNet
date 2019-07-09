@@ -468,5 +468,15 @@ def evaluate_pose(pred_dir,gtruth_dir):
     print("ATE(Absolute Trajectory Error,绝对轨迹误差) mean: %.4f, std: %.4f" % (np.mean(ate_all), np.std(ate_all)))
     pass
 
+def get_available_gpus():
+    from tensorflow.python.client import device_lib as _device_lib
+    local_device_protos = _device_lib.list_local_devices()
+    GPU_names = [x.name for x in local_device_protos if x.device_type == 'GPU']
+    gpu_ids = []
+    for item in GPU_names:
+        gpu_ids.append(int(item[-1:]))
+    return gpu_ids
+
 if __name__ == '__main__':
-    print(find_latest_ckpt('../checkpoints'))
+    #print(find_latest_ckpt('../checkpoints'))
+    print(get_available_gpus())
