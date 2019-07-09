@@ -66,14 +66,7 @@ EvisonNet
 ### 7.评价指标说明
 1. 深度指标:
 
-$abs\_rel=Mean(\left |\frac{gt-pred}{gt}\right|)$<br>
-$sq\_rel=Mean(\frac{(gt-pred)^{2}}{gt})$ <br>
-$rms=\sqrt{Mean((gt-pred)^{2})}$<br>
-$log\_rms=\sqrt{Mean([(log(gt)-log(pred)]^{2})}$<br>
-$a1=Mean((thresh<1.25))$<br>
-$a2=Mean((thresh<1.25^{2}))$<br>
-$a3=Mean((thresh<1.25^{3}))$<br>
-$thresh=np.maximum((\frac{gt}{pred}), (\frac{pred}{ gt}))$<br>
+<a href="https://www.codecogs.com/eqnedit.php?latex=abs\_rel=Mean(\left&space;|\frac{gt-pred}{gt}\right|)\\&space;sq\_rel=Mean(\frac{(gt-pred)^{2}}{gt})\\&space;rms=\sqrt{Mean((gt-pred)^{2})}\\&space;log\_rms=\sqrt{Mean([(log(gt)-log(pred)]^{2})}\\&space;a1=Mean((thresh<1.25))\\&space;a2=Mean((thresh<1.25^{2}))\\&space;a3=Mean((thresh<1.25^{3}))\\&space;thresh=np.maximum((\frac{gt}{pred}),&space;(\frac{pred}{&space;gt}))\\" target="_blank"><img src="https://latex.codecogs.com/gif.latex?abs\_rel=Mean(\left&space;|\frac{gt-pred}{gt}\right|)\\&space;sq\_rel=Mean(\frac{(gt-pred)^{2}}{gt})\\&space;rms=\sqrt{Mean((gt-pred)^{2})}\\&space;log\_rms=\sqrt{Mean([(log(gt)-log(pred)]^{2})}\\&space;a1=Mean((thresh<1.25))\\&space;a2=Mean((thresh<1.25^{2}))\\&space;a3=Mean((thresh<1.25^{3}))\\&space;thresh=np.maximum((\frac{gt}{pred}),&space;(\frac{pred}{&space;gt}))\\" title="abs\_rel=Mean(\left |\frac{gt-pred}{gt}\right|)\\ sq\_rel=Mean(\frac{(gt-pred)^{2}}{gt})\\ rms=\sqrt{Mean((gt-pred)^{2})}\\ log\_rms=\sqrt{Mean([(log(gt)-log(pred)]^{2})}\\ a1=Mean((thresh<1.25))\\ a2=Mean((thresh<1.25^{2}))\\ a3=Mean((thresh<1.25^{3}))\\ thresh=np.maximum((\frac{gt}{pred}), (\frac{pred}{ gt}))\\" /></a>
 
 2. ego-motion指标:
 ATE(Absolute Trajectory Error,绝对轨迹误差)在测试集上的均值和标准差.<br>
