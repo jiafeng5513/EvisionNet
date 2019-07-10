@@ -10,31 +10,7 @@ import os
 import functools
 
 
-def compute_ate(gtruth_file, pred_file):
-    #
-    gtruth_list = read_file_list(gtruth_file)
-    pred_list = read_file_list(pred_file)
-    matches = associate(gtruth_list, pred_list, 0, 0.01)
-    if len(matches) < 2:
-        return False
-
-    gtruth_xyz = np.array([[float(value) for value in gtruth_list[a][0:3]] for a,b in matches])
-    pred_xyz = np.array([[float(value) for value in pred_list[b][0:3]] for a,b in matches])
-    
-    # Make sure that the first matched frames align (no need for rotational alignment as
-    # all the predicted/ground-truth snippets have been converted to use the same coordinate
-    # system with the first frame of the snippet being the origin).
-    offset = gtruth_xyz[0] - pred_xyz[0]
-    pred_xyz += offset[None,:]
-
-    # Optimize the scaling factor
-    scale = np.sum(gtruth_xyz * pred_xyz)/np.sum(pred_xyz ** 2)
-    alignment_error = pred_xyz * scale - gtruth_xyz
-    rmse = np.sqrt(np.sum(alignment_error ** 2))/len(matches)
-    return rmse
-
-
-def compute_ate2(gtruth_list, pred_list):
+def compute_ate(gtruth_list, pred_list):
     #
     matches = associate(gtruth_list, pred_list, 0, 0.01)
     if len(matches) < 2:
@@ -54,6 +30,7 @@ def compute_ate2(gtruth_list, pred_list):
     alignment_error = pred_xyz * scale - gtruth_xyz
     rmse = np.sqrt(np.sum(alignment_error ** 2)) / len(matches)
     return rmse
+
 
 def read_file_list(filename):
     """
@@ -404,53 +381,23 @@ def pose_vec_to_mat(vec):
     return Tmat
 
 
-def dump_pose_seq_TUM(out_file, poses, times):
-    # First frame as the origin
-    first_pose = pose_vec_to_mat(poses[0])
-    with open(out_file, 'w') as f:
-        for p in range(len(times)):
-            this_pose = pose_vec_to_mat(poses[p])
-            this_pose = np.dot(first_pose, np.linalg.inv(this_pose))
-            tx = this_pose[0, 3]
-            ty = this_pose[1, 3]
-            tz = this_pose[2, 3]
-            rot = this_pose[:3, :3]
-            qw, qx, qy, qz = rot2quat(rot)
-            f.write('%f %f %f %f %f %f %f %f\n' % (times[p], tx, ty, tz, qx, qy, qz, qw))
-
-
-def Odometry_12params_to_8params(input_file_name, times, output_file_name):
+def Odometry_12params_to_8params(input_file_name, times):
     GT_8params_list = []
     with open(input_file_name, 'r') as f_in:
         Odometry_12params_lines = f_in.readlines()
-        with open(output_file_name, 'w') as f_out:
-            for i in range(len(Odometry_12params_lines)):
-                line = Odometry_12params_lines[i]
-                params_12_array = np.array([float(s) for s in line.split()])
-                params_12_mat = params_12_array.reshape(3, 4)
+        for i in range(len(Odometry_12params_lines)):
+            line = Odometry_12params_lines[i]
+            params_12_array = np.array([float(s) for s in line.split()])
+            params_12_mat = params_12_array.reshape(3, 4)
 
-                time = times[i]
-                tx = params_12_mat[0, 3]
-                ty = params_12_mat[1, 3]
-                tz = params_12_mat[2, 3]
-                rot = params_12_mat[:3, :3]
-                qw, qx, qy, qz = rot2quat(rot)
-                GT_8params_list.append([time, tx, ty, tz, qx, qy, qz, qw])
-                f_out.write('%f %f %f %f %f %f %f %f\n' % (time, tx, ty, tz, qx, qy, qz, qw))
+            time = times[i]
+            tx = params_12_mat[0, 3]
+            ty = params_12_mat[1, 3]
+            tz = params_12_mat[2, 3]
+            rot = params_12_mat[:3, :3]
+            qw, qx, qy, qz = rot2quat(rot)
+            GT_8params_list.append([time, tx, ty, tz, qx, qy, qz, qw])
     return GT_8params_list
-    pass
-
-
-def create_8params_gtfiles(input_file_name,output_file_path,seq_length):
-    with open(input_file_name, 'r') as f_in:
-        full_file_lines = f_in.readlines()
-        full_lines = np.array([s for s in full_file_lines])
-
-        for i in range(len(full_file_lines)-seq_length):
-            with open(output_file_path+ '/%.6d.txt' %i, 'w') as f_out:
-                for j in range(seq_length):
-                    f_out.writelines(full_lines[i+j])
-    pass
 
 
 def load_image_sequence(dataset_dir, frames, tgt_idx, seq_length, img_height, img_width):

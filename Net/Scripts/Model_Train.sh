@@ -6,4 +6,4 @@
             --img_width=416 \
             --img_height=128 \
             --batch_size=16 \
-            --num_gpus=3
+            --num_gpus=4

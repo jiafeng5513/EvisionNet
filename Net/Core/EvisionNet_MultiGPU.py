@@ -2,16 +2,16 @@
 from __future__ import division
 import time
 import math
-import tensorflow.contrib.slim as slim
+
 import tensorflow as tf
+import tensorflow.contrib.slim as slim
+
+
 import pprint
 import random
 import PIL.Image as pil
 import scipy.misc
-from pose_evaluation_utils import dump_pose_seq_TUM
-from tensorflow.contrib.layers.python.layers import utils
 from glob import glob
-from data_loader import DataLoader
 from data_loader import *
 from utils import *
 import re
@@ -20,12 +20,12 @@ from datetime import datetime
 # Range of disparity/inverse depth values
 DISP_SCALING = 10
 MIN_DISP = 0.01
-
 TOWER_NAME = 'tower'
 
+
 flags = tf.app.flags
-flags.DEFINE_integer("run_mode", 2, "0=train,1=test_depth,2=test_pose")
-flags.DEFINE_string("dataset_dir", "/home/RAID1/DataSet/KITTI/KittiOdometry/", "数据位置")
+flags.DEFINE_integer("run_mode", 0, "0=train,1=test_depth,2=test_pose")
+flags.DEFINE_string("dataset_dir", "/home/RAID1/DataSet/KITTI/KittiRaw_prepared/", "数据位置")
 # KittiOdometry,KittiOdometry_prepared,KittiRaw,KittiRaw_prepared
 
 # test pose  : KittiOdometry     /home/RAID1/DataSet/KITTI/KittiOdometry/
@@ -42,7 +42,7 @@ flags.DEFINE_float("learning_rate", 0.0002, "学习率")
 flags.DEFINE_float("beta1", 0.9, "adam动量参数")
 flags.DEFINE_float("smooth_weight", 0.5, "平滑的权重")
 flags.DEFINE_float("explain_reg_weight", 0.2, "Weight for explanability regularization")
-flags.DEFINE_integer("batch_size", 1, "batch size")
+flags.DEFINE_integer("batch_size", 16, "batch size")
 flags.DEFINE_integer("img_height", 128, "Image height")
 flags.DEFINE_integer("img_width", 416, "Image width")
 flags.DEFINE_integer("seq_length", 3, "一个样本中含有几张图片")
@@ -50,7 +50,7 @@ flags.DEFINE_integer("num_source", 2, "一个样本中有几个是source images,
 flags.DEFINE_integer("max_steps", 200000, "训练迭代次数")
 flags.DEFINE_integer("summary_freq", 100, "summary频率,单位:batch*num_gpus")
 flags.DEFINE_integer("save_freq", 1000, "保存频率,单位:batch*num_gpus")
-flags.DEFINE_integer('num_gpus', 3, "使用多少GPU")
+flags.DEFINE_integer('num_gpus', 4, "使用多少GPU")
 flags.DEFINE_integer('num_epochs', 30, "把整个训练集训练多少次")
 # params for model_test_depth
 flags.DEFINE_string("test_file_list", '../data/kitti/test_files_eigen.txt', "Path to the list of test files")
@@ -59,14 +59,12 @@ flags.DEFINE_float("max_depth", 80, "Threshold for maximum depth")
 
 # params for model_test_pose
 flags.DEFINE_integer("test_seq", 9, "使用KittiOdometry的哪个序列进行测试")  # pick from 22 sequences in KittiOdometry
-flags.DEFINE_string("output_dir", "../test_output/test_pose/", "Output directory")
 
 # add by jiafeng5513,followed by https://github.com/tinghuiz/SfMLearner/pull/70
 flags.DEFINE_integer("num_scales", 4, "number of used image scales")
 
 FLAGS = flags.FLAGS
 
-GPU_ID = [1,2,3]  # 0,1,2,3
 
 def resize_like(inputs, ref):
     iH, iW = inputs.get_shape()[1], inputs.get_shape()[2]
@@ -459,26 +457,28 @@ def train():
     with tf.Graph().as_default(), tf.device('/cpu:0'):
         # 训练次数的计数变量,train()每被调用一次就+1,global_step = batches processed * FLAGS.num_gpus
         global_step = tf.get_variable('global_step', [], initializer=tf.constant_initializer(0), trainable=False)
-
-        # 学习率
-        # num_batches_per_epoch = (NUM_EXAMPLES_PER_EPOCH_FOR_TRAIN / FLAGS.batch_size)
-        # decay_steps = int(num_batches_per_epoch * NUM_EPOCHS_PER_DECAY)
-        # # Decay the learning rate exponentially based on the number of steps.
-        # lr = tf.train.exponential_decay(INITIAL_LEARNING_RATE,
-        #                                 global_step,
-        #                                 decay_steps,
-        #                                 LEARNING_RATE_DECAY_FACTOR,
-        #                                 staircase=True)
-        # 使用动量优化器,目前是固定学习率,TODO:策略学习率
-        # opt = tf.train.MomentumOptimizer(lr, 0.9, use_nesterov=True, use_locking=True)
-        opt = tf.train.AdamOptimizer(FLAGS.learning_rate, FLAGS.beta1, use_locking=True)
-
+        # Data Source
         loader = DataLoader(FLAGS.dataset_dir, FLAGS.batch_size, FLAGS.img_height, FLAGS.img_width,
                             FLAGS.num_source, FLAGS.num_scales)
         num_of_batch_in_an_epoch, num_train_examples, num_val_examples = loader.data_statistics()
         total_step = (FLAGS.num_epochs * num_of_batch_in_an_epoch) // FLAGS.num_gpus
-
         num_step_in_an_epoch = num_of_batch_in_an_epoch // FLAGS.num_gpus
+
+        # 学习率
+        NUM_EPOCHS_PER_DECAY = 1
+        LEARNING_RATE_DECAY_FACTOR = 0.5
+        decay_steps = int(num_step_in_an_epoch * NUM_EPOCHS_PER_DECAY)
+        # Decay the learning rate exponentially based on the number of steps.
+        lr = tf.train.exponential_decay(FLAGS.learning_rate,
+                                        global_step,
+                                        decay_steps,
+                                        LEARNING_RATE_DECAY_FACTOR,
+                                        staircase=True)
+        # 使用动量优化器,目前是固定学习率,TODO:策略学习率
+        # opt = tf.train.MomentumOptimizer(lr, 0.9, use_nesterov=True, use_locking=True)
+        opt = tf.train.AdamOptimizer(lr, FLAGS.beta1, use_locking=True)
+
+
 
 
         tgt_image, src_image_stack, intrinsics = loader.load_train_batch()
@@ -487,8 +487,8 @@ def train():
         # 每个GPU分别计算梯度
         tower_grads = []
         with tf.variable_scope(tf.get_variable_scope()):
-            #for i in range(FLAGS.num_gpus):
-            for i in GPU_ID:
+            for i in range(FLAGS.num_gpus):
+            #for i in GPU_ID:
                 with tf.device('/gpu:%d' % i):
                     with tf.name_scope('%s_%d' % (TOWER_NAME, i)) as scope:
 
@@ -746,11 +746,9 @@ def model_test_pose():
     """
     测试pose
     1. 根据要测试的sequence_id,读取数据集,找到对应的pose_Groundtruth
-    2. 把原有的12参数变更为8参数,存储成all.txt
-    3. 按照sequence_length,把上述数据存储成一系列文件.
-    4. 连接图片,进入网络进行测试
-    5. 把测试结果存储成一系列文件
-    6. 对比这些文件,得到测试结果
+    2. 把原有的12参数变更为8参数
+    3. 连接图片,进入网络进行测试
+    4. 得到测试结果
     这里需要注意的是,每次我们输入sequence_length张图片进入网络,网络会把第一张图作为初始位置,
     但是在GT中,整个序列上千张图片都是连续的,所以直接比较某张图的pose是没有意义的
     比如输入345这三张图,得到p1,p2,p3,
@@ -758,9 +756,6 @@ def model_test_pose():
     我们要做的其实是:计算p1,p2之间的运动,和P1,P2之间的情况作比较
     :return:
     """
-    if not os.path.isdir(FLAGS.output_dir):
-        os.makedirs(FLAGS.output_dir)
-
     input_image, pred_poses = build_pose_test_graph()
     fetches = {}
     fetches['pose'] = pred_poses
@@ -776,18 +771,11 @@ def model_test_pose():
         times_strs = f.readlines()
         times = np.array([float(s[:-1]) for s in times_strs])
 
-    output_file_name = FLAGS.output_dir + '/%.2d' % FLAGS.test_seq + "_pose_gt_all.txt"
     pose_gt_file = os.path.join(FLAGS.dataset_dir, 'poses', '%.2d.txt' % FLAGS.test_seq)
 
     # 创建8参数ground truth 列表 尺寸[N][8],N为该序列的图片数,8依次为:
     # [时间 Tx Ty Tz Qx Qy Qz Qw],其中(Tx Ty Tz)是表示平移的向量,(Qx Qy Qz Qw)是表示旋转的四元数
-    GT_8params_list = Odometry_12params_to_8params(pose_gt_file, times, output_file_name)
-
-    groundTruthPath = FLAGS.output_dir + "/GroundTruth/"
-    if not os.path.isdir(groundTruthPath):
-        os.makedirs(groundTruthPath)
-
-    create_8params_gtfiles(output_file_name, groundTruthPath, FLAGS.seq_length)
+    GT_8params_list = Odometry_12params_to_8params(pose_gt_file, times)
 
     max_src_offset = (FLAGS.seq_length - 1) // 2
     ckpt_name = find_latest_ckpt(FLAGS.checkpoint_dir)
@@ -795,18 +783,15 @@ def model_test_pose():
     saver = tf.train.Saver([var for var in tf.trainable_variables()])
     with tf.Session() as sess:
         saver.restore(sess, ckpt_abs_file_path)
+        predictions_list = []  # [N,FLAGS.seq_length,8],测试序列的图片数量为N,一个样本中有FLAGS.seq_length张图片,每条数据8个参数
         for tgt_idx in range(N):
             if not is_valid_sample(test_frames, tgt_idx, FLAGS.seq_length):
                 continue
             if tgt_idx % 100 == 0:
                 print('Progress: %d/%d' % (tgt_idx, N))
             # TODO: currently assuming batch_size = 1
-            image_seq = load_image_sequence(FLAGS.dataset_dir,
-                                            test_frames,
-                                            tgt_idx,
-                                            FLAGS.seq_length,
-                                            FLAGS.img_height,
-                                            FLAGS.img_width)
+            image_seq = load_image_sequence(FLAGS.dataset_dir,test_frames,tgt_idx,FLAGS.seq_length,
+                                            FLAGS.img_height,FLAGS.img_width)
 
             pred = sess.run(fetches, feed_dict={input_image: image_seq[None, :, :, :]})
             pred_poses = pred['pose'][0]
@@ -814,80 +799,51 @@ def model_test_pose():
             pred_poses = np.insert(pred_poses, max_src_offset, np.zeros((1, 6)), axis=0)
             curr_times = times[tgt_idx - max_src_offset:tgt_idx + max_src_offset + 1]
 
-            predictionPath = FLAGS.output_dir + "/Prediction/"
-            if not os.path.isdir(predictionPath):
-                os.makedirs(predictionPath)
-
-            out_file = predictionPath + '/%.6d.txt' % (tgt_idx - max_src_offset)
-
-            predictions_list = []  # [N,FLAGS.seq_length,8],N为测试序列的图片数量,
-                                   # FLAGS.seq_length为一个样本中有几张图片
-                                   # 8为每条数据的8个参数
-            single_sample = []     # [FLAGS.seq_length,8],单个样本
-
-            #dump_pose_seq_TUM(out_file, pred_poses, curr_times)
+            single_sample = [] # [FLAGS.seq_length,8],单个样本
             # First frame as the origin
-            #(out_file, poses, times)
             first_pose = pose_vec_to_mat(pred_poses[0])
-            with open(out_file, 'w') as f:
-                for p in range(len(curr_times)):
-                    single_sample = []
-                    this_pose = pose_vec_to_mat(pred_poses[p])
-                    this_pose = np.dot(first_pose, np.linalg.inv(this_pose))
-                    tx = this_pose[0, 3]
-                    ty = this_pose[1, 3]
-                    tz = this_pose[2, 3]
-                    rot = this_pose[:3, :3]
-                    qw, qx, qy, qz = rot2quat(rot)
-                    single_sample.append([curr_times[p], tx, ty, tz, qx, qy, qz, qw])
-                    f.write('%f %f %f %f %f %f %f %f\n' % (curr_times[p], tx, ty, tz, qx, qy, qz, qw))
-                predictions_list.append(single_sample)
-    # evaluate_pose(predictionPath, groundTruthPath)
+            for p in range(len(curr_times)):
+                this_pose = pose_vec_to_mat(pred_poses[p])
+                this_pose = np.dot(first_pose, np.linalg.inv(this_pose))
+                tx = this_pose[0, 3]
+                ty = this_pose[1, 3]
+                tz = this_pose[2, 3]
+                rot = this_pose[:3, :3]
+                qw, qx, qy, qz = rot2quat(rot)
+                single_sample.append([curr_times[p], tx, ty, tz, qx, qy, qz, qw])
+            predictions_list.append(single_sample)
 
-    pred_files = glob(predictionPath + '/*.txt')
     ate_all = []
-
     # 从GT_8params_list中取出对应的FLAGS.seq_length条数据
     # 读取对应的predictions_list中的FLAGS.seq_length条数据
     # 把上述两种数据都转换为字典,key是时间戳,value是后面七个值
-    # 传入compute_ate2进行计算
+    # 传入compute_ate进行计算
     for i in range(len(predictions_list)):
         gt_sample = {}
         pred_sample = {}
         for j in range(FLAGS.seq_length):
             gt_sample[GT_8params_list[i+j][0]] = GT_8params_list[i+j][1:]
             pred_sample[predictions_list[i][j][0]] = predictions_list[i][j][1:]
-        ate = compute_ate2(gt_sample, pred_sample)
+        ate = compute_ate(gt_sample, pred_sample)
         if ate == False:
             continue
         ate_all.append(ate)
         pass
-
-
-    # for i in range(len(pred_files)):
-    #     gtruth_file = groundTruthPath + os.path.basename(pred_files[i])
-    #     if not os.path.exists(gtruth_file):
-    #         continue
-    #     ate = compute_ate(gtruth_file, pred_files[i])
-    #     if ate == False:
-    #         continue
-    #     ate_all.append(ate)
     ate_all = np.array(ate_all)
-    print("Predictions dir: %s" % predictionPath)
     print("ATE(Absolute Trajectory Error,绝对轨迹误差) mean: %.4f, std: %.4f" % (np.mean(ate_all), np.std(ate_all)))
 
     pass
 
 
 def main(_):
-    start_time = time.time()
+    _start_time = time.time()
     if FLAGS.run_mode == 0:
         model_train_all()
     elif FLAGS.run_mode == 1:
         model_test_depth()
     elif FLAGS.run_mode == 2:
         model_test_pose()
-    time_elapsed = time.time() - start_time
+    time_elapsed = time.time() - _start_time
     h = time_elapsed // 3600
     m = (time_elapsed - 3600 * h) // 60
     s = time_elapsed - 3600 * h - m * 60
@@ -897,4 +853,3 @@ def main(_):
 
 if __name__ == '__main__':
     tf.app.run()
-   # print(get_available_gpus())
