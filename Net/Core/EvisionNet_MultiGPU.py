@@ -465,8 +465,8 @@ def train():
         num_step_in_an_epoch = num_of_batch_in_an_epoch // FLAGS.num_gpus
 
         # 学习率
-        NUM_EPOCHS_PER_DECAY = 1
-        LEARNING_RATE_DECAY_FACTOR = 0.5
+        NUM_EPOCHS_PER_DECAY = 5
+        LEARNING_RATE_DECAY_FACTOR = 0.6
         decay_steps = int(num_step_in_an_epoch * NUM_EPOCHS_PER_DECAY)
         # Decay the learning rate exponentially based on the number of steps.
         lr = tf.train.exponential_decay(FLAGS.learning_rate,
@@ -514,8 +514,7 @@ def train():
                 summaries.append(
                     tf.summary.histogram(var.op.name + '/gradients', grad))
         # Add a summary to track the learning rate.
-        summaries.append(
-            tf.summary.scalar('learning_rate', FLAGS.learning_rate, family='global'))  # 目前使用的是固定学习率 TODO:策略学习率
+        summaries.append(tf.summary.scalar('learning_rate', lr, family='global'))  # 目前使用的是固定学习率 TODO:策略学习率
 
         # 应用梯度
         train_op = opt.apply_gradients(grads, global_step=global_step)
