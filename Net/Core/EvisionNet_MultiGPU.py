@@ -6,7 +6,6 @@ import math
 import tensorflow as tf
 import tensorflow.contrib.slim as slim
 
-
 import pprint
 import random
 import PIL.Image as pil
@@ -22,10 +21,10 @@ DISP_SCALING = 10
 MIN_DISP = 0.01
 TOWER_NAME = 'tower'
 
-
 flags = tf.app.flags
 flags.DEFINE_integer("run_mode", 0, "0=train,1=test_depth,2=test_pose")
 flags.DEFINE_string("dataset_dir", "/home/RAID1/DataSet/KITTI/KittiRaw_prepared/", "数据位置")
+flags.DEFINE_string("log_prefix", None, "prefix for log")
 # KittiOdometry,KittiOdometry_prepared,KittiRaw,KittiRaw_prepared
 
 # test pose  : KittiOdometry     /home/RAID1/DataSet/KITTI/KittiOdometry/
@@ -39,17 +38,17 @@ flags.DEFINE_string("init_checkpoint_file", None, "用来初始化的ckpt")
 flags.DEFINE_boolean("continue_train", False, "是否从之前的ckpt继续训练")
 
 flags.DEFINE_float("learning_rate", 0.0002, "学习率")
+flags.DEFINE_float("learning_rate_decay_factor", 0.6, "学习率 shuai jian")
+flags.DEFINE_integer("num_epochs_per_decay", 5, "NUM_EPOCHS_PER_DECAY")
+
 flags.DEFINE_float("beta1", 0.9, "adam动量参数")
 flags.DEFINE_float("smooth_weight", 0.5, "平滑的权重")
-flags.DEFINE_float("explain_reg_weight", 0.2, "Weight for explanability regularization")
-flags.DEFINE_integer("batch_size", 16, "batch size")
+flags.DEFINE_float("explain_reg_weight", 0.0, "Weight for explanability regularization")
+flags.DEFINE_integer("batch_size", 4, "batch size")
 flags.DEFINE_integer("img_height", 128, "Image height")
 flags.DEFINE_integer("img_width", 416, "Image width")
 flags.DEFINE_integer("seq_length", 3, "一个样本中含有几张图片")
 flags.DEFINE_integer("num_source", 2, "一个样本中有几个是source images,这个值应该比seq_length少1")
-flags.DEFINE_integer("max_steps", 200000, "训练迭代次数")
-flags.DEFINE_integer("summary_freq", 100, "summary频率,单位:batch*num_gpus")
-flags.DEFINE_integer("save_freq", 1000, "保存频率,单位:batch*num_gpus")
 flags.DEFINE_integer('num_gpus', 4, "使用多少GPU")
 flags.DEFINE_integer('num_epochs', 30, "把整个训练集训练多少次")
 # params for model_test_depth
@@ -398,7 +397,6 @@ def tower_loss(tgt_image, src_image_stack, intrinsics, scope):
        Tensor of shape [] containing the total loss for a batch of data
     """
 
-
     with tf.name_scope("depth_prediction"):
         pred_disp = disp_net(tgt_image, is_training=True)
 
@@ -465,21 +463,16 @@ def train():
         num_step_in_an_epoch = num_of_batch_in_an_epoch // FLAGS.num_gpus
 
         # 学习率
-        NUM_EPOCHS_PER_DECAY = 5
-        LEARNING_RATE_DECAY_FACTOR = 0.6
-        decay_steps = int(num_step_in_an_epoch * NUM_EPOCHS_PER_DECAY)
+        decay_steps = int(num_step_in_an_epoch * FLAGS.num_epochs_per_decay)
         # Decay the learning rate exponentially based on the number of steps.
         lr = tf.train.exponential_decay(FLAGS.learning_rate,
                                         global_step,
                                         decay_steps,
-                                        LEARNING_RATE_DECAY_FACTOR,
+                                        FLAGS.learning_rate_decay_factor,
                                         staircase=True)
         # 使用动量优化器,目前是固定学习率,TODO:策略学习率
         # opt = tf.train.MomentumOptimizer(lr, 0.9, use_nesterov=True, use_locking=True)
         opt = tf.train.AdamOptimizer(lr, FLAGS.beta1, use_locking=True)
-
-
-
 
         tgt_image, src_image_stack, intrinsics = loader.load_train_batch()
         batch_queue = tf.contrib.slim.prefetch_queue.prefetch_queue(
@@ -488,10 +481,9 @@ def train():
         tower_grads = []
         with tf.variable_scope(tf.get_variable_scope()):
             for i in range(FLAGS.num_gpus):
-            #for i in GPU_ID:
+                # for i in GPU_ID:
                 with tf.device('/gpu:%d' % i):
                     with tf.name_scope('%s_%d' % (TOWER_NAME, i)) as scope:
-
                         tgt_image, src_image_stack, intrinsics = batch_queue.dequeue()
                         # 计算损失,注意,数据的加载,预测值,损失计算都包含在其中
                         _loss = tower_loss(tgt_image, src_image_stack, intrinsics, scope)
@@ -518,7 +510,6 @@ def train():
 
         # 应用梯度
         train_op = opt.apply_gradients(grads, global_step=global_step)
-
 
         # 可训练变量的曲线图
 
@@ -574,12 +565,20 @@ def train():
                     num_examples_per_step = FLAGS.batch_size * FLAGS.num_gpus
                     examples_per_sec = num_examples_per_step / duration
                     sec_per_batch = duration / FLAGS.num_gpus
-                    format_str = '%s: epoch = %3d, step=(%d/%d,%.3f%%), loss = %.2f (%.1f examples/sec; %.3f sec/batch)'
-                    print(format_str % (datetime.now(), current_epoch, step,
-                                        total_step,(step/total_step)*100, loss_value, examples_per_sec, sec_per_batch))
+                    # format_str = '%s: epoch = %3d, step=(%d/%d,%.3f%%), loss = %.2f (%.1f examples/sec; %.3f sec/batch)'
+                    # print(format_str % (datetime.now(), current_epoch, step,
+                    #                     total_step,(step/total_step)*100, loss_value, examples_per_sec, sec_per_batch))
+                    log_str = '{}: epoch = {:<3}, step=({}/{},{:.3}%), loss = {:.2} ({:.1} examples/sec; ' \
+                              '{:.3} sec/batch)'.format(datetime.now(), current_epoch, step, total_step,
+                                                        (step / total_step) * 100, loss_value, examples_per_sec,
+                                                        sec_per_batch)
+                    print(log_str)
+                    log(log_str)
+
                 # 模型保存
                 if (step != 0) and (step % num_step_in_an_epoch == 0):  # an epoch is done
-                    print(" [*] %3dth epoch done! Saving latest checkpoint to %s..." % (current_epoch, FLAGS.checkpoint_dir))
+                    print(" [*] %3dth epoch done! Saving latest checkpoint to %s..." % (
+                    current_epoch, FLAGS.checkpoint_dir))
                     saver.save(sess, os.path.join(FLAGS.checkpoint_dir, 'model'), global_step=step)
 
                 if step * FLAGS.num_gpus >= FLAGS.num_epochs * num_of_batch_in_an_epoch:
@@ -608,7 +607,8 @@ def build_pose_test_graph():
     input_uint8 = tf.placeholder(tf.uint8, [FLAGS.batch_size, FLAGS.img_height, FLAGS.img_width * FLAGS.seq_length, 3],
                                  name='raw_input')
     input_mc = preprocess_image(input_uint8)
-    tgt_image, src_image_stack = batch_unpack_image_sequence(input_mc, FLAGS.img_height, FLAGS.img_width, FLAGS.num_source)
+    tgt_image, src_image_stack = batch_unpack_image_sequence(input_mc, FLAGS.img_height, FLAGS.img_width,
+                                                             FLAGS.num_source)
     with tf.name_scope("pose_prediction"):
         pred_poses, _ = pose_exp_net(tgt_image, src_image_stack, do_exp=False, is_training=False)
     return input_uint8, pred_poses
@@ -619,7 +619,7 @@ def build_depth_test_graph():
     build depth net for test
     :return:
     """
-    input_uint8 = tf.placeholder(tf.uint8, [FLAGS.batch_size,FLAGS.img_height, FLAGS.img_width, 3], name='raw_input')
+    input_uint8 = tf.placeholder(tf.uint8, [FLAGS.batch_size, FLAGS.img_height, FLAGS.img_width, 3], name='raw_input')
     input_mc = preprocess_image(input_uint8)
     with tf.name_scope("depth_prediction"):
         pred_disp = disp_net(input_mc, is_training=False)
@@ -631,7 +631,6 @@ def build_depth_test_graph():
 class EvisionNet(object):
     def __init__(self):
         pass
-
 
     def collect_summaries(self):
         opt = self.opt
@@ -669,7 +668,6 @@ class EvisionNet(object):
         # for grad, var in self.grads_and_vars:
         #     tf.summary.histogram(var.op.name + "/gradients", grad)
 
-
     def deprocess_image(self, image):
         # Assuming input image is float32
         image = (image + 1.) / 2.
@@ -701,8 +699,7 @@ def model_test_depth():
         test_files = [FLAGS.dataset_dir + t[:-1] for t in test_files]
     basename = os.path.basename(ckpt_name)
 
-
-    input_image,pred_depth = build_depth_test_graph()
+    input_image, pred_depth = build_depth_test_graph()
     fetches = {}
     fetches['depth'] = pred_depth
 
@@ -789,8 +786,8 @@ def model_test_pose():
             if tgt_idx % 100 == 0:
                 print('Progress: %d/%d' % (tgt_idx, N))
             # TODO: currently assuming batch_size = 1
-            image_seq = load_image_sequence(FLAGS.dataset_dir,test_frames,tgt_idx,FLAGS.seq_length,
-                                            FLAGS.img_height,FLAGS.img_width)
+            image_seq = load_image_sequence(FLAGS.dataset_dir, test_frames, tgt_idx, FLAGS.seq_length,
+                                            FLAGS.img_height, FLAGS.img_width)
 
             pred = sess.run(fetches, feed_dict={input_image: image_seq[None, :, :, :]})
             pred_poses = pred['pose'][0]
@@ -798,7 +795,7 @@ def model_test_pose():
             pred_poses = np.insert(pred_poses, max_src_offset, np.zeros((1, 6)), axis=0)
             curr_times = times[tgt_idx - max_src_offset:tgt_idx + max_src_offset + 1]
 
-            single_sample = [] # [FLAGS.seq_length,8],单个样本
+            single_sample = []  # [FLAGS.seq_length,8],单个样本
             # First frame as the origin
             first_pose = pose_vec_to_mat(pred_poses[0])
             for p in range(len(curr_times)):
@@ -821,7 +818,7 @@ def model_test_pose():
         gt_sample = {}
         pred_sample = {}
         for j in range(FLAGS.seq_length):
-            gt_sample[GT_8params_list[i+j][0]] = GT_8params_list[i+j][1:]
+            gt_sample[GT_8params_list[i + j][0]] = GT_8params_list[i + j][1:]
             pred_sample[predictions_list[i][j][0]] = predictions_list[i][j][1:]
         ate = compute_ate(gt_sample, pred_sample)
         if ate == False:
@@ -829,16 +826,26 @@ def model_test_pose():
         ate_all.append(ate)
         pass
     ate_all = np.array(ate_all)
-    print("ATE(Absolute Trajectory Error,绝对轨迹误差) mean: %.4f, std: %.4f" % (np.mean(ate_all), np.std(ate_all)))
+    log_str = 'mean: {:.4},std: {:.4}'.format(np.mean(ate_all), np.std(ate_all))
+    log(log_str)
+    print("ATE(Absolute Trajectory Error,绝对轨迹误差)")
+    print(log_str)
 
     pass
 
 
 def main(_):
+    log_init(FLAGS.log_prefix)  # init the log sys
+    param_log_str = 'epoch={},init_lr={}(decay by {} in every{}epochs),momentum={},W_smooth={},W_explain={},' \
+                    'batch size={}' \
+        .format(FLAGS.num_epochs, FLAGS.learning_rate, FLAGS.learning_rate_decay_factor, FLAGS.num_epochs_per_decay
+                , FLAGS.beta1, FLAGS.smooth_weight, FLAGS.explain_reg_weight, FLAGS.batch_size)
+    log(param_log_str)
     _start_time = time.time()
     if FLAGS.run_mode == 0:
         model_train_all()
     elif FLAGS.run_mode == 1:
+
         model_test_depth()
     elif FLAGS.run_mode == 2:
         model_test_pose()
@@ -847,6 +854,7 @@ def main(_):
     m = (time_elapsed - 3600 * h) // 60
     s = time_elapsed - 3600 * h - m * 60
     print('Complete in {:.0f}h {:.0f}m {:.0f}s'.format(h, m, s))
+
     pass
 
 

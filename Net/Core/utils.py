@@ -9,6 +9,7 @@ import requests
 from depth_evaluation_utils import *
 from glob import glob
 from pose_evaluation_utils import *
+import time
 
 
 def gray2rgb(im, cmap='gray'):
@@ -95,20 +96,20 @@ def pose_vec2mat(vec):
   """
     batch_size, _ = vec.get_shape().as_list()
     translation = tf.slice(vec, [0, 0], [-1, 3])  # 切出只含有平移的部分,尺寸为[B,3]
-    translation = tf.expand_dims(translation, -1) # 最后加一个维度,[B,4]
+    translation = tf.expand_dims(translation, -1)  # 最后加一个维度,[B,4]
     rx = tf.slice(vec, [0, 3], [-1, 1])  # 从vec里面把rx切下来,[B,1],下同
     ry = tf.slice(vec, [0, 4], [-1, 1])
     rz = tf.slice(vec, [0, 5], [-1, 1])
-    rot_mat = euler2mat(rz, ry, rx)     # 欧拉角转旋转矩阵,z,y,x都是[B,1],一组x,y,z转成一个3x3的旋转矩阵,结果是[B,1,3,3]
-    rot_mat = tf.squeeze(rot_mat, axis=[1])  #删除1位的那个维度,变成[B,3,3]
+    rot_mat = euler2mat(rz, ry, rx)  # 欧拉角转旋转矩阵,z,y,x都是[B,1],一组x,y,z转成一个3x3的旋转矩阵,结果是[B,1,3,3]
+    rot_mat = tf.squeeze(rot_mat, axis=[1])  # 删除1位的那个维度,变成[B,3,3]
     filler = tf.constant([0.0, 0.0, 0.0, 1.0], shape=[1, 1, 4])  # 创建[1,1,4]的变量
     filler = tf.tile(filler, [batch_size, 1, 1])  # 创建[4,1,4]的变量[[[0. 0. 0. 1.]]
-                                                  #                  [[0. 0. 0. 1.]]
-                                                  #                  [[0. 0. 0. 1.]]
-                                                  #                  [[0. 0. 0. 1.]]]
+    #                  [[0. 0. 0. 1.]]
+    #                  [[0. 0. 0. 1.]]
+    #                  [[0. 0. 0. 1.]]]
     transform_mat = tf.concat([rot_mat, translation], axis=2)
     transform_mat = tf.concat([transform_mat, filler], axis=1)  # [B,4,4],最后一行是0,0,0,1,一共4个有效数字
-    return transform_mat #[]
+    return transform_mat  # []
 
 
 def pixel2cam(depth, pixel_coords, intrinsics, is_homogeneous=True):
@@ -355,15 +356,15 @@ def find_latest_ckpt(ckpt_path):
     for file in os.listdir(ckpt_path):
         if os.path.splitext(file)[1] == '.meta':
             prefix = os.path.splitext(file)[0]
-            if prefix =='model.latest':
+            if prefix == 'model.latest':
                 return prefix
                 pass
             else:
-                dict_meta[int(prefix.split('-')[1])]=prefix
+                dict_meta[int(prefix.split('-')[1])] = prefix
     return dict_meta[max(dict_meta.keys())]
 
 
-def evaluate_depth(pred_depths,test_file_list,kitti_dir,min_depth,max_depth):
+def evaluate_depth(pred_depths, test_file_list, kitti_dir, min_depth, max_depth):
     """
     evaluate the test result of depth net
     :param pred_file:
@@ -373,7 +374,7 @@ def evaluate_depth(pred_depths,test_file_list,kitti_dir,min_depth,max_depth):
     :param max_depth:
     :return:
     """
-    #pred_depths = np.load(pred_file)
+    # pred_depths = np.load(pred_file)
     test_files = read_text_lines(test_file_list)
     gt_files, gt_calib, im_sizes, im_files, cams = read_file_data(test_files, kitti_dir)
     num_test = len(im_files)
@@ -425,11 +426,14 @@ def evaluate_depth(pred_depths,test_file_list,kitti_dir,min_depth,max_depth):
         abs_rel[i], sq_rel[i], rms[i], log_rms[i], a1[i], a2[i], a3[i] = \
             compute_errors(gt_depth[mask], pred_depth[mask])
 
-    print("{:>10}, {:>10}, {:>10}, {:>10}, {:>10}, {:>10},  {:>10}"\
-            .format('abs_rel', 'sq_rel', 'rms', 'log_rms',  'a1', 'a2', 'a3'))
+    print("{:>10}, {:>10}, {:>10}, {:>10}, {:>10}, {:>10},  {:>10}" \
+          .format('abs_rel', 'sq_rel', 'rms', 'log_rms', 'a1', 'a2', 'a3'))
 
-    print("{:10.4f}, {:10.4f}, {:10.4f}, {:10.4f}, {:10.4f}, {:10.4f}, {:10.4f}"\
-          .format(abs_rel.mean(), sq_rel.mean(), rms.mean(), log_rms.mean(), a1.mean(), a2.mean(),a3.mean()))
+    log_str = "{:10.4f}, {:10.4f}, {:10.4f}, {:10.4f}, {:10.4f}, {:10.4f}, {:10.4f}" \
+        .format(abs_rel.mean(), sq_rel.mean(), rms.mean(), log_rms.mean(), a1.mean(), a2.mean(), a3.mean())
+
+    print(log_str)
+    log(log_str)
 
     print("最终输出的值都是整个测试集上所有图片取均值之后的结果")
     print("abs_rel : (|gt-pred|/gt).mean")
@@ -443,7 +447,7 @@ def evaluate_depth(pred_depths,test_file_list,kitti_dir,min_depth,max_depth):
     pass
 
 
-def evaluate_pose(pred_dir,gtruth_dir):
+def evaluate_pose(pred_dir, gtruth_dir):
     """
     BUG:gt for pose evaluate is rely on  pose_eval_data.tar,
         we do not know the way used for generate the gt in the tar,
@@ -465,8 +469,12 @@ def evaluate_pose(pred_dir,gtruth_dir):
         ate_all.append(ate)
     ate_all = np.array(ate_all)
     print("Predictions dir: %s" % pred_dir)
-    print("ATE(Absolute Trajectory Error,绝对轨迹误差) mean: %.4f, std: %.4f" % (np.mean(ate_all), np.std(ate_all)))
+    log_str = "ATE(Absolute Trajectory Error,绝对轨迹误差) mean: {.4f}, std: {.4f}".format(np.mean(ate_all), np.std(ate_all))
+    print(log_str)
+    log(log_str)
+
     pass
+
 
 def get_available_gpus():
     from tensorflow.python.client import device_lib as _device_lib
@@ -477,6 +485,38 @@ def get_available_gpus():
         gpu_ids.append(int(item[-1:]))
     return gpu_ids
 
+
+global log_file_path
+
+
+def log_init(log_prefix):
+    if log_prefix is None:
+        time_local = time.localtime(int(time.time()))
+        log_prefix = time.strftime("%Y%m%d%H%M%S", time_local)
+    global log_file_path
+    log_file_name = "LOG_" + log_prefix + ".txt"
+    if not os.path.exists('../logs/'):
+        os.makedirs('../logs/')
+    log_file_path = os.path.join('../logs/', log_file_name)
+    pass
+
+
+def log(log_str):
+    global log_file_path
+    with open(log_file_path, 'a+') as file_to_read:
+        file_to_read.write(log_str)
+        file_to_read.write("\n")
+    pass
+
+
 if __name__ == '__main__':
-    #print(find_latest_ckpt('../checkpoints'))
-    print(get_available_gpus())
+    log_init()
+
+    h = 1
+    m = 2
+    s = 3
+    log('Complete in {:.0f}h {:.0f}m {:.0f}s'.format(h, m, s))
+    time.sleep(3)
+    log(str(time.time()))
+    time.sleep(3)
+    log(str(time.time()))
