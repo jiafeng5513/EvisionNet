@@ -1,131 +1,125 @@
-# SfMLearner Pytorch version
-This codebase implements the system described in the paper:
-
-Unsupervised Learning of Depth and Ego-Motion from Video
-
-[Tinghui Zhou](https://people.eecs.berkeley.edu/~tinghuiz/), [Matthew Brown](http://matthewalunbrown.com/research/research.html), [Noah Snavely](http://www.cs.cornell.edu/~snavely/), [David G. Lowe](http://www.cs.ubc.ca/~lowe/home.html)
-
-In CVPR 2017 (**Oral**).
-
-See the [project webpage](https://people.eecs.berkeley.edu/~tinghuiz/projects/SfMLearner/) for more details. 
-
-Original Author : Tinghui Zhou (tinghuiz@berkeley.edu)
-Pytorch implementation : Clément Pinard (clement.pinard@ensta-paristech.fr)
-
-![sample_results](misc/cityscapes_sample_results.gif)
-
-## Preamble
-This codebase was developed and tested with Pytorch 1.0.1, CUDA 10 and Ubuntu 16.04. Original code was developped in tensorflow, you can access it [here](https://github.com/tinghuiz/SfMLearner)
-
-## Prerequisite
-
-```bash
-pip3 install -r requirements.txt
-```
-
-or install manually the following packages :
-
-```
-pytorch >= 1.0.1
-pebble
-matplotlib
-imageio
-scipy
-argparse
-tensorboardX
-blessings
-progressbar2
-path.py
-```
-
-### Note
-Because it uses latests pytorch features, it is not compatible with anterior versions of pytorch.
-
-If you don't have an up to date pytorch, the tags can help you checkout the right commits corresponding to your pytorch version.
-
-### What has been done
+## 1. What has been done
 
 * Training has been tested on KITTI and CityScapes.
 * Dataset preparation has been largely improved, and now stores image sequences in folders, making sure that movement is each time big enough between each frame
-* That way, training is now significantly faster, running at ~0.14sec per step vs ~0.2s per steps initially (on a single GTX980Ti)
-* In addition you don't need to prepare data for a particular sequence length anymore as stacking is made on the fly.
+* 训练速度提升
+* 改变序列长度的时候不需要重新进行数据准备
 * You can still choose the former stacked frames dataset format.
-* Convergence is now almost as good as original paper with same hyper parameters
 * You can know compare with groud truth for your validation set. It is still possible to validate without, but you now can see that minimizing photometric error is not equivalent to optimizing depth map.
+* 平滑损失应用于深度而不是视差(应用于视差,在权重0.5的时候并不容易收敛,参见tensorflow版本)
+* 如此更改的平滑损失会提升深度预测效果,但是会使位置预测效果变差,可以在[here](train.py#L270)改成原来的情况.
+* 下采样的时候权重除以2.3(原来是2),经验值
 
-### Differences with official Implementation
+## 2.数据准备
 
-* Smooth Loss is different from official repo. Instead of applying it to disparity, we apply it to depth. Original disparity smooth loss did not work well (don't know why !) and it did not even converge at all with weight values used (0.5).
-* loss is divided by `2.3` when downscaling instead of `2`. This is the results of empiric experiments, so the optimal value is clearly not carefully determined.
-* As a consequence, with a smooth loss of `2.0̀`, depth test is better, but Pose test is worse. To revert smooth loss back to original, you can change it [here](train.py#L270)
-
-## Preparing training data
-Preparation is roughly the same command as in the original code.
-
-For [KITTI](http://www.cvlibs.net/datasets/kitti/raw_data.php), first download the dataset using this [script](http://www.cvlibs.net/download.php?file=raw_data_downloader.zip) provided on the official website, and then run the following command. The `--with-depth` option will save resized copies of groundtruth to help you setting hyper parameters. The `--with-pose` will dump the sequence pose in the same format as Odometry dataset (see pose evaluation)
+### 2.1.[KITTI](http://www.cvlibs.net/datasets/kitti/raw_data.php): <br>
+1. 下载脚本: [script](http://www.cvlibs.net/download.php?file=raw_data_downloader.zip)<br>
+2. 运行下面的脚本 <br>
+3. `--with-depth` option will save resized copies of groundtruth to help you setting hyper parameters. <br>
+4.  `--with-pose` will dump the sequence pose in the same format as Odometry dataset (see pose evaluation)<br>
 ```bash
-python3 data/prepare_train_data.py /path/to/raw/kitti/dataset/ --dataset-format 'kitti' --dump-root /path/to/resulting/formatted/data/ --width 416 --height 128 --num-threads 4 [--static-frames /path/to/static_frames.txt] [--with-depth] [--with-pose]
+python3 data/prepare_train_data.py \
+        /path/to/raw/kitti/dataset/ \
+        --dataset-format 'kitti' \
+        --dump-root /path/to/resulting/formatted/data/ \
+        --width 416 \
+        --height 128 \
+        --num-threads 4 \
+        [--static-frames /path/to/static_frames.txt] \
+        [--with-depth] \
+        [--with-pose]
 ```
-
-
-For [Cityscapes](https://www.cityscapes-dataset.com/), download the following packages: 1) `leftImg8bit_sequence_trainvaltest.zip`, 2) `camera_trainvaltest.zip`. You will probably need to contact the administrators to be able to get it. Then run the following command
+### 2.2.[Cityscapes](https://www.cityscapes-dataset.com/):
+ 1. 下载 `leftImg8bit_sequence_trainvaltest.zip 和 camera_trainvaltest.zip`. <br>
+ 2. 运行下面的脚本 <br>
 ```bash
-python3 data/prepare_train_data.py /path/to/cityscapes/dataset/ --dataset-format 'cityscapes' --dump-root /path/to/resulting/formatted/data/ --width 416 --height 171 --num-threads 4
+python3 data/prepare_train_data.py \
+        /path/to/cityscapes/dataset/ \
+        --dataset-format 'cityscapes' \
+        --dump-root /path/to/resulting/formatted/data/ \
+        --width 416 \
+        --height 171 \
+        --num-threads 4
 ```
-Notice that for Cityscapes the `img_height` is set to 171 because we crop out the bottom part of the image that contains the car logo, and the resulting image will have height 128.
+Notice that for Cityscapes the img_height is set to 171 because we crop out the bottom part of the image that contains the car logo, and the resulting image will have height 128.
 
-## Training
-Once the data are formatted following the above instructions, you should be able to train the model by running the following command
+
+## 3.训练
 ```bash
-python3 train.py /path/to/the/formatted/data/ -b4 -m0.2 -s0.1 --epoch-size 3000 --sequence-length 3 --log-output [--with-gt]
+python3 train.py \
+        /path/to/the/formatted/data/ \
+        -b 4 \
+        -m 0.2 \
+        -s 0.1 \
+        --epoch-size 3000 \
+        --sequence-length 3 \
+        --log-output \
+        [--with-gt]
 ```
 You can then start a `tensorboard` session in this folder by
 ```bash
 tensorboard --logdir=checkpoints/
 ```
-and visualize the training progress by opening [https://localhost:6006](https://localhost:6006) on your browser. If everything is set up properly, you should start seeing reasonable depth prediction after ~30K iterations when training on KITTI.
+在KITTI上~30K iterations的训练可以得到较好的结果
 
-## Evaluation
-
-Disparity map generation can be done with `run_inference.py`
+## 4.评价与测试
+### 4.1. 生成视差图<br>
 ```bash
-python3 run_inference.py --pretrained /path/to/dispnet --dataset-dir /path/pictures/dir --output-dir /path/to/output/dir
+python3 run_inference.py \
+        --pretrained /path/to/dispnet \
+        --dataset-dir /path/pictures/dir \
+        --output-dir /path/to/output/dir
 ```
-Will run inference on all pictures inside `dataset-dir` and save a jpg of disparity (or depth) to `output-dir` for each one see script help (`-h`) for more options.
+使用`dataset-dir`下的所有图片生成对应的深度图(或视差图)并存储在 `output-dir`, 使用`-h`可以查看帮助.
 
-Disparity evaluation is avalaible
+### 4.2. 视差/深度预测功能的评价<br>
 ```bash
-python3 test_disp.py --pretrained-dispnet /path/to/dispnet --pretrained-posenet /path/to/posenet --dataset-dir /path/to/KITTI_raw --dataset-list /path/to/test_files_list
+python3 test_disp.py \
+        --pretrained-dispnet /path/to/dispnet \
+        --pretrained-posenet /path/to/posenet \
+        --dataset-dir /path/to/KITTI_raw \
+        --dataset-list /path/to/test_files_list
 ```
+test_file_list 在 kitti_eval文件夹下面. 
+如果要和原论文的评价结果公平比较的话,不要给出posenet.
+如果给出了posenet,它会被用来消除缩放因子(scale factor)的歧义,此时唯一用来获取缩放因子的GT将会是车速,这更接近于真实情况,但是显然测试效果会变差.
 
-Test file list is available in kitti eval folder. To get fair comparison with [Original paper evaluation code](https://github.com/tinghuiz/SfMLearner/blob/master/kitti_eval/eval_depth.py), don't specify a posenet. However, if you do,  it will be used to solve the scale factor ambiguity, the only ground truth used to get it will be vehicle speed which is far more acceptable for real conditions quality measurement, but you will obviously get worse results.
-
+### 4.3. ego-motion功能的测评<br> 
 Pose evaluation is also available on [Odometry dataset](http://www.cvlibs.net/datasets/kitti/eval_odometry.php). Be sure to download both color images and pose !
-
 ```bash
-python3 test_pose.py /path/to/posenet --dataset-dir /path/to/KITIT_odometry --sequences [09]
+python3 test_pose.py \
+        /path/to/posenet \
+        --dataset-dir /path/to/KITIT_odometry \
+        --sequences [09]
 ```
 
-**ATE** (*Absolute Trajectory Error*) is computed as long as **RE** for rotation (*Rotation Error*). **RE** between `R1` and `R2` is defined as the angle of `R1*R2^-1` when converted to axis/angle. It corresponds to `RE = arccos( (trace(R1 @ R2^-1) - 1) / 2)`.
+**ATE** (*Absolute Trajectory Error*) is computed as long as **RE** for rotation (*Rotation Error*). 
+**RE** between `R1` and `R2` is defined as the angle of `R1*R2^-1` when converted to axis/angle. 
+It corresponds to `RE = arccos( (trace(R1 @ R2^-1) - 1) / 2)`.
 While **ATE** is often said to be enough to trajectory estimation, **RE** seems important here as sequences are only `seq_length` frames long.
 
-## Pretrained Nets
-
+## 5.预训练网络
 [Avalaible here](https://drive.google.com/drive/folders/1H1AFqSS8wr_YzwG2xWwAQHTfXN5Moxmx)
-
-Arguments used :
-
+对应的训练参数:
 ```bash
-python3 train.py /path/to/the/formatted/data/ -b4 -m0 -s2.0 --epoch-size 1000 --sequence-length 5 --log-output --with-gt
+python3 train.py \
+        /path/to/the/formatted/data/ \
+        -b4 \
+        -m0 \
+        -s2.0 \
+        --epoch-size 1000 \
+        --sequence-length 5 \
+        --log-output \
+        --with-gt
 ```
 
-### Depth Results
+### 5.1 Depth Results
 
 | Abs Rel | Sq Rel | RMSE  | RMSE(log) | Acc.1 | Acc.2 | Acc.3 |
 |---------|--------|-------|-----------|-------|-------|-------|
 | 0.181   | 1.341  | 6.236 | 0.262     | 0.733 | 0.901 | 0.964 | 
 
-### Pose Results
+### 5.2 Pose Results
 
 5-frames snippets used
 
@@ -135,7 +129,7 @@ python3 train.py /path/to/the/formatted/data/ -b4 -m0 -s2.0 --epoch-size 1000 --
 |RE  | 0.0018 (std. 0.0009) | 0.0018 (std. 0.0011) | 
 
 
-## Discussion
+## 6.Discussion
 
 Here I try to link the issues that I think raised interesting questions about scale factor, pose inference, and training hyperparameters
 
@@ -148,6 +142,3 @@ Here I try to link the issues that I think raised interesting questions about sc
  - [Issue 24](https://github.com/ClementPinard/SfmLearner-Pytorch/issues/24) : Filtering pixels out of the photometric loss
  - [Issue 60](https://github.com/ClementPinard/SfmLearner-Pytorch/issues/60) : Inverse warp is only one way !
 
-## Other Implementations
-
-[TensorFlow](https://github.com/tinghuiz/SfMLearner) by tinghuiz (original code, and paper author)
