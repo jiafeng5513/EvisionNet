@@ -7,7 +7,7 @@ from path import Path
 import argparse
 from tqdm import tqdm
 
-from Pytorch_version.models import DispNetS, PoseExpNet
+from models import DispNetS, PoseExpNet
 
 
 parser = argparse.ArgumentParser(description='Script for DispNet testing with corresponding groundTruth',
@@ -36,9 +36,9 @@ device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cp
 def main():
     args = parser.parse_args()
     if args.gt_type == 'KITTI':
-        from Pytorch_version.kitti_eval.depth_evaluation_utils import test_framework_KITTI as test_framework
+        from kitti_eval.depth_evaluation_utils import test_framework_KITTI as test_framework
     elif args.gt_type == 'stillbox':
-        from Pytorch_version.stillbox_eval.depth_evaluation_utils import test_framework_stillbox as test_framework
+        from stillbox_eval.depth_evaluation_utils import test_framework_stillbox as test_framework
 
     disp_net = DispNetS().to(device)
     weights = torch.load(args.pretrained_dispnet)

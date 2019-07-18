@@ -6,8 +6,8 @@ from path import Path
 import argparse
 from tqdm import tqdm
 
-from Pytorch_version.models import PoseExpNet
-from Pytorch_version.inverse_warp import pose_vec2mat
+from models import PoseExpNet
+from inverse_warp import pose_vec2mat
 
 
 parser = argparse.ArgumentParser(description='Script for PoseNet testing with corresponding groundTruth from KITTI Odometry',
@@ -31,7 +31,7 @@ device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cp
 @torch.no_grad()
 def main():
     args = parser.parse_args()
-    from Pytorch_version.kitti_eval.pose_evaluation_utils import test_framework_KITTI as test_framework
+    from kitti_eval.pose_evaluation_utils import test_framework_KITTI as test_framework
 
     weights = torch.load(args.pretrained_posenet)
     seq_length = int(weights['state_dict']['conv1.0.weight'].size(1)/3)

@@ -683,7 +683,7 @@ def model_test_pose():
     if not os.path.isdir(groundTruthPath):
         os.makedirs(groundTruthPath)
 
-    create_8params_gtfiles(output_file_name, groundTruthPath, FLAGS.seq_length)
+    #create_8params_gtfiles(output_file_name, groundTruthPath, FLAGS.seq_length)
 
 
     max_src_offset = (FLAGS.seq_length - 1) // 2

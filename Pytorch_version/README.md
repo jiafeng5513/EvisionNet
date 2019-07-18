@@ -70,7 +70,11 @@ python3 run_inference.py \
         --dataset-dir /path/pictures/dir \
         --output-dir /path/to/output/dir
 ```
-使用`dataset-dir`下的所有图片生成对应的深度图(或视差图)并存储在 `output-dir`, 使用`-h`可以查看帮助.
+使用`dataset-dir`下的所有图片生成对应的深度图(或视差图)并存储在 `output-dir`.<br>
+使用`-h`可以查看帮助.<br>
+`--output-depth` for depth map<br>
+`--output-disp` for disparity map<br>
+
 
 ### 4.2. 视差/深度预测功能的评价<br>
 ```bash

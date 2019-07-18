@@ -7,8 +7,8 @@ from path import Path
 import argparse
 from tqdm import tqdm
 
-from Pytorch_version.models import DispNetS
-from Pytorch_version.my_utils import tensor2array
+from models import DispNetS
+from my_utils import tensor2array
 
 parser = argparse.ArgumentParser(description='Inference script for DispNet learned with \
                                  Structure from Motion Learner inference on KITTI and CityScapes Dataset',
