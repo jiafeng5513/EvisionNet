@@ -1,18 +1,14 @@
 # -*- coding: utf-8 -*-
 from __future__ import division
-import time
 import math
 import tensorflow.contrib.slim as slim
 import pprint
-import random
 import PIL.Image as pil
 import scipy.misc
 from pose_evaluation_utils import dump_pose_seq_TUM
 from tensorflow.contrib.layers.python.layers import utils
 from glob import glob
-from data_loader import DataLoader
 from data_loader import *
-from utils import *
 
 # Range of disparity/inverse depth values
 DISP_SCALING = 10

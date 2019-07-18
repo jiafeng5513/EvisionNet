@@ -796,16 +796,16 @@ local.properties
 
 *.tar
 *.npy
-/Tensorflow_version/checkpoints/
-/Tensorflow_version/test_output/
-/Tensorflow_version/Core/kitti_eval/pose_data/
-/Tensorflow_version/models/depth_model
-/Tensorflow_version/models/pose_model
+/utils/Tensorflow_version/checkpoints/
+/utils/Tensorflow_version/test_output/
+/utils/Tensorflow_version/Core/kitti_eval/pose_data/
+/utils/Tensorflow_version/models/depth_model
+/utils/Tensorflow_version/models/pose_model
 
-!/Tensorflow_version/Scripts/
+!/utils/Tensorflow_version/Scripts/
 !*.sh
-/Tensorflow_version/Core/test_output/
-Tensorflow_version/Core/test_output/
+/utils/Tensorflow_version/Core/test_output/
+utils/Tensorflow_version/Core/test_output/
 将删除 Net/checkpoints/checkpoint
 将删除 Net/checkpoints/events.out.tfevents.1562160262.GpuServer
 将删除 Net/checkpoints/graph.pbtxt

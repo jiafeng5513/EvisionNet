@@ -1,18 +1,10 @@
 # -*- coding: utf-8 -*-
 from __future__ import division
-import time
-import math
-
-import tensorflow as tf
-import tensorflow.contrib.slim as slim
 
 import pprint
-import random
 import PIL.Image as pil
-import scipy.misc
 from glob import glob
 from data_loader import *
-from utils import *
 import re
 from datetime import datetime
 

@@ -17,21 +17,28 @@ from tqdm import tqdm
 
 parser = argparse.ArgumentParser(description='EvisionNet', formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 
+"""Program Initialization parameters"""
 parser.add_argument('data', metavar='/home/RAID1/DataSet/KITTI/KittiRaw_formatted/', help='预处理后的数据集路径')
 parser.add_argument('--dataset-format', default='sequential', metavar='STR', help='数据格式, stacked:连帧;sequential:单帧序列')
+parser.add_argument('-j', '--workers', default=4, type=int, metavar='N', help='数据加载线程数')
+parser.add_argument('--pretrained-disp', dest='pretrained_disp', default=None, metavar='PATH', help='预训练Disp-Net的路径')
+parser.add_argument('--pretrained-exppose', dest='pretrained_exp_pose', default=None, metavar='PATH', help='预训练pose-net的路径')
+parser.add_argument('--log-summary', default='progress_log_summary.csv', metavar='PATH', help='保存每个epoch的训练和验证情况的csv文件名')
+parser.add_argument('--log-full', default='progress_log_full.csv', metavar='PATH', help='保存训练期间每次梯度下降后的情况的csv')
+
+
+"""Init-parameters of training"""
+parser.add_argument('--with-gt', action='store_true', help='验证时是否使用GT,若要使用,在数据准备时需要使用--with-depth')
 parser.add_argument('--sequence-length', type=int, metavar='N', help='每个训练样本由几帧构成', default=3)
 parser.add_argument('--rotation-mode', type=str, choices=['euler', 'quat'], default='euler',
                     help='旋转表示方法: euler:欧拉角(yaw,pitch,roll);quaternion:四元数 (last 3 coefficients)')
-
 parser.add_argument('--padding-mode', type=str, choices=['zeros', 'border'], default='zeros',
                     help='重投影期间的延拓模式, 这会影响重投影误差的计算.'
                          ' zeros: will null gradients outside target image.'
                          ' border will only null gradients of the coordinate outside (x or y)')
 
-parser.add_argument('--with-gt', action='store_true', help='验证时是否使用GT,若要使用,在数据准备时需要使用--with-depth')
 
-parser.add_argument('-j', '--workers', default=4, type=int, metavar='N', help='数据加载线程数')
-
+"""Hyper-parameters of training"""
 parser.add_argument('--epochs', default=200, type=int, metavar='N', help='训练多少epoch')
 parser.add_argument('--epoch-size', default=3000, type=int, metavar='N', help='手动设置每个epoch的样本数量,如果不设置将会根据数据集的情况定值')
 parser.add_argument('-b', '--batch-size', default=4, type=int, metavar='N', help='mini-batch size')
@@ -44,20 +51,12 @@ parser.add_argument('-p', '--photo-loss-weight', type=float, help='一致性损�
 parser.add_argument('-m', '--mask-loss-weight', type=float, help='mask损失的权重', metavar='W',default=0.2)
 parser.add_argument('-s', '--smooth-loss-weight', type=float, help='视差平滑损失的权重', metavar='W',default=0.1)
 
-parser.add_argument('--pretrained-disp', dest='pretrained_disp', default=None, metavar='PATH', help='预训练Disp-Net的路径')
-parser.add_argument('--pretrained-exppose', dest='pretrained_exp_pose', default=None, metavar='PATH', help='预训练pose-net的路径')
 
-parser.add_argument('-e', '--evaluate', dest='evaluate', action='store_true', help='打开这个将在验证集上评估模型')
+"""Program Behavior Parameters"""
+parser.add_argument('-e', '--evaluate', dest='evaluate', action='store_true', help='打开这个将在验证集上评估模型,and skip training')
 parser.add_argument('--log-output', action='store_true', help='开启后,验证期间dispnet的输出和重投影图片会被保存')
-
-
-parser.add_argument('--log-summary', default='progress_log_summary.csv', metavar='PATH', help='保存每个epoch的训练和验证情况的csv文件名')
-parser.add_argument('--log-full', default='progress_log_full.csv', metavar='PATH', help='保存训练期间每次梯度下降后的情况的csv')
-
-
-#parser.add_argument('--print-freq', default=10, type=int,metavar='N', help='print frequency')
-
-parser.add_argument('-f', '--training-output-freq', type=int,help='训练期间输出dispnet和重投影图片的频率,设为0则不输出', metavar='N', default=0)
+parser.add_argument('--print-freq', default=10, type=int, metavar='N', help='print frequency')
+parser.add_argument('-f', '--training-output-freq', type=int, help='训练期间输出dispnet和重投影图片的频率,设为0则不输出', metavar='N', default=0)
 
 best_error = -1
 n_iter = 0
@@ -238,7 +237,7 @@ def train(args, train_loader, disp_net, pose_exp_net, optimizer, epoch_size, tb_
 
     train_pbar = tqdm(total=min(len(train_loader), args.epoch_size),
                       bar_format='{desc} {percentage:3.0f}%|{bar}| {postfix}')
-    train_pbar.set_description('Train: Loss=#.####(#.####)')
+    train_pbar.set_description('Train: Total Loss=#.####(#.####)')
     train_pbar.set_postfix_str('<TIME: op=#.###(#.###) data=#.###(#.###)>')
 
     for i, (tgt_img, ref_imgs, intrinsics, intrinsics_inv) in enumerate(train_loader):
@@ -294,9 +293,9 @@ def train(args, train_loader, disp_net, pose_exp_net, optimizer, epoch_size, tb_
         with open(args.save_path / args.log_full, 'a') as csvfile:
             writer = csv.writer(csvfile, delimiter='\t')
             writer.writerow([loss.item(), loss_1.item(), loss_2.item() if w2 > 0 else 0, loss_3.item()])
-
+        train_pbar.clear()
         train_pbar.update(1)
-        train_pbar.set_description('Train: Loss={}'.format(losses))
+        train_pbar.set_description('Train: Total Loss={}'.format(losses))
         train_pbar.set_postfix_str('<TIME: op={} data={}>'.format(batch_time, data_time))
         if i >= epoch_size - 1:
             break
@@ -372,10 +371,11 @@ def validate_without_gt(args, val_loader, disp_net, pose_exp_net, epoch, tb_writ
         # measure elapsed time
         batch_time.update(time.time() - end)
         end = time.time()
+        validate_pbar.clear()
         validate_pbar.update(1)
         validate_pbar.set_description('valid: Loss {}'.format(losses))
         validate_pbar.set_postfix_str('<Time {}>'.format(batch_time))
-
+    validate_pbar.close()
 
     if log_outputs:
         prefix = 'valid poses'
@@ -387,8 +387,9 @@ def validate_without_gt(args, val_loader, disp_net, pose_exp_net, epoch, tb_writ
         for i in range(poses.shape[1]):
             tb_writer.add_histogram('{} {}'.format(prefix, coeffs_names[i]), poses[:, i], epoch)
         tb_writer.add_histogram('disp_values', disp_values, epoch)
-    validate_pbar.close()
-    time.sleep(1)
+        time.sleep(0.2)
+    else:
+        time.sleep(1)
     return losses.avg, ['Total loss', 'Photo loss', 'Exp loss']
 
 
