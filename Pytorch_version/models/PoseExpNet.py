@@ -36,6 +36,14 @@ class PoseExpNet(nn.Module):
 
         self.pose_pred = nn.Conv2d(conv_planes[6], 6*self.nb_ref_imgs, kernel_size=1, padding=0)#
 
+        # intrinsics part
+        self.conv8 = conv(conv_planes[4], conv_planes[5])
+        self.conv9 = conv(conv_planes[5], conv_planes[6])
+        self.conv10 = conv(conv_planes[6], conv_planes[3])
+        self.conv11 = conv(conv_planes[3], conv_planes[1])
+        self.intr_pred = nn.Conv2d(conv_planes[1], 4, kernel_size=1, padding=0)
+
+
         if self.output_exp:
             upconv_planes = [256, 128, 64, 32, 16]
             self.upconv5 = upconv(conv_planes[4],   upconv_planes[0])
@@ -73,6 +81,14 @@ class PoseExpNet(nn.Module):
         pose = pose.mean(3).mean(2)
         pose = 0.01 * pose.view(pose.size(0), self.nb_ref_imgs, 6)
 
+        out_conv8 = self.conv8(out_conv5)
+        out_conv9 = self.conv9(out_conv8)
+        out_conv10 = self.conv10(out_conv9)
+        out_conv11 = self.conv11(out_conv10)
+        intrinsics = self.intr_pred(out_conv11)
+
+        intrinsics = intrinsics.view(intrinsics.size(0),4)
+
         if self.output_exp:
             out_upconv5 = self.upconv5(out_conv5  )[:, :, 0:out_conv4.size(2), 0:out_conv4.size(3)]
             out_upconv4 = self.upconv4(out_upconv5)[:, :, 0:out_conv3.size(2), 0:out_conv3.size(3)]
@@ -91,6 +107,6 @@ class PoseExpNet(nn.Module):
             exp_mask1 = None
 
         if self.training:
-            return [exp_mask1, exp_mask2, exp_mask3, exp_mask4], pose
+            return [exp_mask1, exp_mask2, exp_mask3, exp_mask4], pose, intrinsics
         else:
-            return exp_mask1, pose
+            return exp_mask1, pose, intrinsics

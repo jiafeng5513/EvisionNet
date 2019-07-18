@@ -1,14 +1,13 @@
 import argparse
 import time
 import csv
-
 import numpy as np
 import torch
 import torch.backends.cudnn as cudnn
 import torch.optim
 import torch.utils.data
 import models, custom_transforms
-from my_utils import tensor2array, save_checkpoint, save_path_formatter, log_output_tensorboard
+from my_utils import tensor2array, save_checkpoint, save_path_formatter, log_output_tensorboard, intrinsics_pred_decode
 
 from loss_functions import photometric_reconstruction_loss, explainability_loss, smooth_loss, compute_errors
 from logger import AverageMeter
@@ -50,7 +49,7 @@ parser.add_argument('--seed', default=0, type=int, help='随机种子')
 parser.add_argument('-p', '--photo-loss-weight', type=float, help='一致性损失的权重', metavar='W', default=1)
 parser.add_argument('-m', '--mask-loss-weight', type=float, help='mask损失的权重', metavar='W',default=0.2)
 parser.add_argument('-s', '--smooth-loss-weight', type=float, help='视差平滑损失的权重', metavar='W',default=0.1)
-
+parser.add_argument('--intri_pred', dest='intri_pred', action='store_true', help='open=predict intri,close = gt intri')
 
 """Program Behavior Parameters"""
 parser.add_argument('-e', '--evaluate', dest='evaluate', action='store_true', help='打开这个将在验证集上评估模型,and skip training')
@@ -253,11 +252,18 @@ def train(args, train_loader, disp_net, pose_exp_net, optimizer, epoch_size, tb_
         # compute output
         disparities = disp_net(tgt_img)
         depth = [1 / disp for disp in disparities]
-        explainability_mask, pose = pose_exp_net(tgt_img, ref_imgs)
+        explainability_mask, pose, intrinsics_pred = pose_exp_net(tgt_img, ref_imgs)
 
-        loss_1, warped, diff = photometric_reconstruction_loss(tgt_img, ref_imgs, intrinsics,
+        if args.intri_pred:
+            # construct intrinsics[4,3,3] with intrinsics_pred[4,4]
+            tmin = intrinsics_pred_decode(intrinsics_pred).to(device)
+            loss_1, warped, diff = photometric_reconstruction_loss(tgt_img, ref_imgs, tmin,
                                                                depth, explainability_mask, pose,
                                                                args.rotation_mode, args.padding_mode)
+        else:
+            loss_1, warped, diff = photometric_reconstruction_loss(tgt_img, ref_imgs, intrinsics,
+                                                                   depth, explainability_mask, pose,
+                                                                   args.rotation_mode, args.padding_mode)
         if w2 > 0:
             loss_2 = explainability_loss(explainability_mask)
         else:
@@ -335,9 +341,17 @@ def validate_without_gt(args, val_loader, disp_net, pose_exp_net, epoch, tb_writ
         # compute output
         disp = disp_net(tgt_img)
         depth = 1 / disp
-        explainability_mask, pose = pose_exp_net(tgt_img, ref_imgs)
 
-        loss_1, warped, diff = photometric_reconstruction_loss(tgt_img, ref_imgs,
+        explainability_mask, pose, intrinsics_pred= pose_exp_net(tgt_img, ref_imgs)
+        if args.intri_pred:
+            # construct intrinsics[4,3,3] with intrinsics_pred[4,4]
+            tmin = intrinsics_pred_decode(intrinsics_pred).to(device)
+            loss_1, warped, diff = photometric_reconstruction_loss(tgt_img, ref_imgs,
+                                                               tmin, depth,
+                                                               explainability_mask, pose,
+                                                               args.rotation_mode, args.padding_mode)
+        else:
+            loss_1, warped, diff = photometric_reconstruction_loss(tgt_img, ref_imgs,
                                                                intrinsics, depth,
                                                                explainability_mask, pose,
                                                                args.rotation_mode, args.padding_mode)

@@ -32,6 +32,8 @@ def save_path_formatter(args, parser):
         value = args_dict[key]
         if not is_default(key, value):
             folder_string.append('{}{}'.format(prefix, value))
+    if args.intri_pred:
+        folder_string.append('calib')
     save_path = Path(','.join(folder_string))
     timestamp = datetime.datetime.now().strftime("%m-%d-%H:%M")
     return save_path/timestamp
@@ -107,3 +109,13 @@ def save_checkpoint(save_path, dispnet_state, exp_pose_state, is_best, filename=
     if is_best:
         for prefix in file_prefixes:
             shutil.copyfile(save_path/'{}_{}'.format(prefix,filename), save_path/'{}_model_best.pth.tar'.format(prefix))
+
+
+def intrinsics_pred_decode(input):
+    xn = input.detach().cpu().numpy()
+    y = []
+    for i in range(input.shape[0]):
+        y.append([[xn[i][0], 0, xn[i][2]],
+                  [0, xn[i][1], xn[i][3]],
+                  [0, 0, 1]])
+    return torch.from_numpy(np.array(y)).float()
