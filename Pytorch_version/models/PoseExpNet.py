@@ -34,7 +34,7 @@ class PoseExpNet(nn.Module):
         self.conv6 = conv(conv_planes[4], conv_planes[5])
         self.conv7 = conv(conv_planes[5], conv_planes[6])
 
-        self.pose_pred = nn.Conv2d(conv_planes[6], 6*self.nb_ref_imgs, kernel_size=1, padding=0)
+        self.pose_pred = nn.Conv2d(conv_planes[6], 6*self.nb_ref_imgs, kernel_size=1, padding=0)#
 
         if self.output_exp:
             upconv_planes = [256, 128, 64, 32, 16]

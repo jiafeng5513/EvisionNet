@@ -8,3 +8,4 @@ blessings
 progressbar2
 path.py
 pebble
+tqdm

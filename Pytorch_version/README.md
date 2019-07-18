@@ -1,7 +1,6 @@
 ## 1. What has been done
-
-* Training has been tested on KITTI and CityScapes.
-* Dataset preparation has been largely improved, and now stores image sequences in folders, making sure that movement is each time big enough between each frame
+* Dataset preparation has been largely improved, and now stores image sequences in folders, 
+making sure that movement is each time big enough between each frame
 * 训练速度提升
 * 改变序列长度的时候不需要重新进行数据准备
 * You can still choose the former stacked frames dataset format.
