@@ -272,6 +272,8 @@ def train(args, train_loader, disp_net, pose_exp_net, optimizer, epoch_size, tb_
 
         loss = w1 * loss_1 + w2 * loss_2 + w3 * loss_3
 
+        if loss < 0.0005:
+            abc = 0
         if log_losses:
             tb_writer.add_scalar('photometric_error', loss_1.item(), n_iter)
             if w2 > 0:

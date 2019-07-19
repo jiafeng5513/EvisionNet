@@ -112,6 +112,11 @@ def save_checkpoint(save_path, dispnet_state, exp_pose_state, is_best, filename=
 
 
 def intrinsics_pred_decode(input):
+    """
+    https://www.jianshu.com/p/f1bd4ff84926
+    :param input:
+    :return:
+    """
     xn = input.detach().cpu().numpy()
     y = []
     for i in range(input.shape[0]):
