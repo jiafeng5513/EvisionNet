@@ -70,7 +70,7 @@ def main():
     elif args.dataset_format == 'sequential':
         from Pytorch_version.datasets.sequence_folders import SequenceFolder
     save_path = save_path_formatter(args, parser)
-    args.save_path = 'checkpoints' / save_path
+    args.save_path = '.\checkpoints' / save_path
     print('=> will save everything to {}'.format(args.save_path))
     args.save_path.makedirs_p()
     torch.manual_seed(args.seed)
@@ -347,7 +347,7 @@ def validate_without_gt(args, val_loader, disp_net, pose_exp_net, epoch, tb_writ
         explainability_mask, pose, intrinsics_pred= pose_exp_net(tgt_img, ref_imgs)
         if args.intri_pred:
             # construct intrinsics[4,3,3] with intrinsics_pred[4,4]
-            tmin = intrinsics_pred_decode(intrinsics_pred).to(device)
+            tmin = intrinsics_pred_decode(intrinsics_pred)
             loss_1, warped, diff = photometric_reconstruction_loss(tgt_img, ref_imgs,
                                                                tmin, depth,
                                                                explainability_mask, pose,
