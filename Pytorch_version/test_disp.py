@@ -117,7 +117,7 @@ def main():
             middle_index = seq_length//2
             tgt = ref_imgs[middle_index]
             reorganized_refs = ref_imgs[:middle_index] + ref_imgs[middle_index + 1:]
-            _, poses = pose_net(tgt, reorganized_refs)
+            _, poses, _ = pose_net(tgt, reorganized_refs)
             displacement_magnitudes = poses[0,:,:3].norm(2,1).cpu().numpy()
 
             scale_factor = np.mean(sample['displacements'] / displacement_magnitudes)

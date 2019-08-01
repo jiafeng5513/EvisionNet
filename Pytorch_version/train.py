@@ -1,6 +1,7 @@
 import argparse
 import time
 import csv
+import sys
 import numpy as np
 import torch
 import torch.backends.cudnn as cudnn
@@ -21,10 +22,11 @@ parser.add_argument('data', metavar='/home/RAID1/DataSet/KITTI/KittiRaw_formatte
 parser.add_argument('--dataset-format', default='sequential', metavar='STR', help='数据格式, stacked:连帧;sequential:单帧序列')
 parser.add_argument('-j', '--workers', default=4, type=int, metavar='N', help='数据加载线程数')
 parser.add_argument('--pretrained-disp', dest='pretrained_disp', default=None, metavar='PATH', help='预训练Disp-Net的路径')
-parser.add_argument('--pretrained-exppose', dest='pretrained_exp_pose', default=None, metavar='PATH', help='预训练pose-net的路径')
-parser.add_argument('--log-summary', default='progress_log_summary.csv', metavar='PATH', help='保存每个epoch的训练和验证情况的csv文件名')
+parser.add_argument('--pretrained-exppose', dest='pretrained_exp_pose', default=None, metavar='PATH',
+                    help='预训练pose-net的路径')
+parser.add_argument('--log-summary', default='progress_log_summary.csv', metavar='PATH',
+                    help='保存每个epoch的训练和验证情况的csv文件名')
 parser.add_argument('--log-full', default='progress_log_full.csv', metavar='PATH', help='保存训练期间每次梯度下降后的情况的csv')
-
 
 """Init-parameters of training"""
 parser.add_argument('--with-gt', action='store_true', help='验证时是否使用GT,若要使用,在数据准备时需要使用--with-depth')
@@ -36,26 +38,26 @@ parser.add_argument('--padding-mode', type=str, choices=['zeros', 'border'], def
                          ' zeros: will null gradients outside target image.'
                          ' border will only null gradients of the coordinate outside (x or y)')
 
-
 """Hyper-parameters of training"""
 parser.add_argument('--epochs', default=200, type=int, metavar='N', help='训练多少epoch')
 parser.add_argument('--epoch-size', default=3000, type=int, metavar='N', help='手动设置每个epoch的样本数量,如果不设置将会根据数据集的情况定值')
 parser.add_argument('-b', '--batch-size', default=4, type=int, metavar='N', help='mini-batch size')
-parser.add_argument('--lr', '--learning-rate', default=2e-4, type=float,metavar='LR', help='学习率')
+parser.add_argument('--lr', '--learning-rate', default=2e-4, type=float, metavar='LR', help='学习率')
 parser.add_argument('--momentum', default=0.9, type=float, metavar='M', help='SGD的动量,Adam的alpha')
 parser.add_argument('--beta', default=0.999, type=float, metavar='M', help='Adam的beta')
 parser.add_argument('--weight-decay', '--wd', default=0, type=float, metavar='W', help='weight decay')
 parser.add_argument('--seed', default=0, type=int, help='随机种子')
 parser.add_argument('-p', '--photo-loss-weight', type=float, help='一致性损失的权重', metavar='W', default=1)
-parser.add_argument('-m', '--mask-loss-weight', type=float, help='mask损失的权重', metavar='W',default=0.2)
-parser.add_argument('-s', '--smooth-loss-weight', type=float, help='视差平滑损失的权重', metavar='W',default=0.1)
+parser.add_argument('-m', '--mask-loss-weight', type=float, help='mask损失的权重', metavar='W', default=0.2)
+parser.add_argument('-s', '--smooth-loss-weight', type=float, help='视差平滑损失的权重', metavar='W', default=0.1)
 parser.add_argument('--intri_pred', dest='intri_pred', action='store_true', help='open=predict intri,close = gt intri')
 
 """Program Behavior Parameters"""
 parser.add_argument('-e', '--evaluate', dest='evaluate', action='store_true', help='打开这个将在验证集上评估模型,and skip training')
 parser.add_argument('--log-output', action='store_true', help='开启后,验证期间dispnet的输出和重投影图片会被保存')
 parser.add_argument('--print-freq', default=10, type=int, metavar='N', help='print frequency')
-parser.add_argument('-f', '--training-output-freq', type=int, help='训练期间输出dispnet和重投影图片的频率,设为0则不输出', metavar='N', default=0)
+parser.add_argument('-f', '--training-output-freq', type=int, help='训练期间输出dispnet和重投影图片的频率,设为0则不输出', metavar='N',
+                    default=0)
 
 best_error = -1
 n_iter = 0
@@ -70,7 +72,10 @@ def main():
     elif args.dataset_format == 'sequential':
         from Pytorch_version.datasets.sequence_folders import SequenceFolder
     save_path = save_path_formatter(args, parser)
-    args.save_path = '.\checkpoints' / save_path
+    if sys.platform is 'win32':
+        args.save_path = '.\checkpoints' / save_path
+    else:  # linux
+        args.save_path = 'checkpoints' / save_path
     print('=> will save everything to {}'.format(args.save_path))
     args.save_path.makedirs_p()
     torch.manual_seed(args.seed)
@@ -178,7 +183,8 @@ def main():
             errors, error_names = validate_without_gt(args, val_loader, disp_net, pose_exp_net, 0, tb_writer)
         for error, name in zip(errors, error_names):
             tb_writer.add_scalar(name, error, 0)
-        error_string = ', '.join('{} : {:.3f}'.format(name, error) for name, error in zip(error_names[2:9], errors[2:9]))
+        error_string = ', '.join(
+            '{} : {:.3f}'.format(name, error) for name, error in zip(error_names[2:9], errors[2:9]))
         tqdm.write(error_string)
 
     for epoch in range(args.epochs):
@@ -258,8 +264,8 @@ def train(args, train_loader, disp_net, pose_exp_net, optimizer, epoch_size, tb_
             # construct intrinsics[4,3,3] with intrinsics_pred[4,4]
             tmin = intrinsics_pred_decode(intrinsics_pred).to(device)
             loss_1, warped, diff = photometric_reconstruction_loss(tgt_img, ref_imgs, tmin,
-                                                               depth, explainability_mask, pose,
-                                                               args.rotation_mode, args.padding_mode)
+                                                                   depth, explainability_mask, pose,
+                                                                   args.rotation_mode, args.padding_mode)
         else:
             loss_1, warped, diff = photometric_reconstruction_loss(tgt_img, ref_imgs, intrinsics,
                                                                    depth, explainability_mask, pose,
@@ -344,19 +350,19 @@ def validate_without_gt(args, val_loader, disp_net, pose_exp_net, epoch, tb_writ
         disp = disp_net(tgt_img)
         depth = 1 / disp
 
-        explainability_mask, pose, intrinsics_pred= pose_exp_net(tgt_img, ref_imgs)
+        explainability_mask, pose, intrinsics_pred = pose_exp_net(tgt_img, ref_imgs)
         if args.intri_pred:
             # construct intrinsics[4,3,3] with intrinsics_pred[4,4]
             tmin = intrinsics_pred_decode(intrinsics_pred)
             loss_1, warped, diff = photometric_reconstruction_loss(tgt_img, ref_imgs,
-                                                               tmin, depth,
-                                                               explainability_mask, pose,
-                                                               args.rotation_mode, args.padding_mode)
+                                                                   tmin, depth,
+                                                                   explainability_mask, pose,
+                                                                   args.rotation_mode, args.padding_mode)
         else:
             loss_1, warped, diff = photometric_reconstruction_loss(tgt_img, ref_imgs,
-                                                               intrinsics, depth,
-                                                               explainability_mask, pose,
-                                                               args.rotation_mode, args.padding_mode)
+                                                                   intrinsics, depth,
+                                                                   explainability_mask, pose,
+                                                                   args.rotation_mode, args.padding_mode)
         loss_1 = loss_1.item()
         if w2 > 0:
             loss_2 = explainability_loss(explainability_mask).item()

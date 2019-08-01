@@ -12,6 +12,14 @@ python3 train.py /home/RAID1/DataSet/KITTI/KittiRaw_formatted/ -b4 -m0.2 -s0.1 -
 python3 run_inference.py --pretrained /home/RAID1/Projects/EvisionNet/Pytorch_version/checkpoints/KittiRaw_formatted/07-14-18:10/dispnet_model_best.pth.tar --dataset-dir /home/RAID1/DataSet/KITTI/Test/ --output-dir /home/RAID1/DataSet/KITTI/Test/output/ --output-depth
 
 
-python3 test_disp.py --pretrained-dispnet /home/RAID1/Projects/EvisionNet/Pytorch_version/checkpoints/KittiRaw_formatted/07-14-18:10/dispnet_checkpoint.pth.tar --pretrained-posenet /home/RAID1/Projects/EvisionNet/Pytorch_version/checkpoints/KittiRaw_formatted/07-14-18:10/exp_pose_model_best.pth.tar --dataset-dir /home/RAID1/DataSet/KITTI/KittiRaw/ --dataset-list /home/RAID1/Projects/EvisionNet/Pytorch_version/kitti_eval/test_files_eigen.txt
+python3 test_disp.py --pretrained-dispnet /home/RAID1/Projects/EvisionNet/Pytorch_version/checkpoints/KittiRaw_formatted,m0.6,calib/07-27-2120/dispnet_model_best.pth.tar --pretrained-posenet /home/RAID1/Projects/EvisionNet/Pytorch_version/checkpoints/KittiRaw_formatted,m0.6,calib/07-27-2120/exp_pose_model_best.pth.tar --dataset-dir /home/RAID1/DataSet/KITTI/KittiRaw/ --dataset-list /home/RAID1/Projects/EvisionNet/Pytorch_version/kitti_eval/test_files_eigen.txt
 
-python3 test_pose.py /home/RAID1/Projects/EvisionNet/Pytorch_version/checkpoints/KittiRaw_formatted/07-14-18:10/exp_pose_model_best.pth.tar --dataset-dir /home/RAID1/DataSet/KITTI/KittiOdometry/ --sequences 09
+python3 test_pose.py /home/RAID1/Projects/EvisionNet/Pytorch_version/checkpoints/KittiRaw_formatted,m0.6,calib/07-27-2120/exp_pose_model_best.pth.tar --dataset-dir /home/RAID1/DataSet/KITTI/KittiOdometry/ --sequences 09
+
+Pytorch_version/checkpoints/KittiRaw_formatted,m0.6/07-29-0949/dispnet_model_best.pth.tar
+
+Pytorch_version/checkpoints/KittiRaw_formatted,m0.6/07-29-0949/exp_pose_model_best.pth.tar
+
+python3 test_disp.py --pretrained-dispnet /home/RAID1/Projects/EvisionNet/Pytorch_version/checkpoints/KittiRaw_formatted,m0.6/07-29-0949/dispnet_model_best.pth.tar --pretrained-posenet /home/RAID1/Projects/EvisionNet/Pytorch_version/checkpoints/KittiRaw_formatted,m0.6/07-29-0949/exp_pose_model_best.pth.tar --dataset-dir /home/RAID1/DataSet/KITTI/KittiRaw/ --dataset-list /home/RAID1/Projects/EvisionNet/Pytorch_version/kitti_eval/test_files_eigen.txt
+
+python3 test_pose.py /home/RAID1/Projects/EvisionNet/Pytorch_version/checkpoints/KittiRaw_formatted,m0.6/07-29-0949/exp_pose_model_best.pth.tar --dataset-dir /home/RAID1/DataSet/KITTI/KittiOdometry/ --sequences 09

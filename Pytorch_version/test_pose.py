@@ -66,7 +66,7 @@ def main():
             else:
                 ref_imgs.append(img)
 
-        _, poses = pose_net(tgt_img, ref_imgs)
+        _, poses, _ = pose_net(tgt_img, ref_imgs)
 
         poses = poses.cpu()[0]
         poses = torch.cat([poses[:len(imgs)//2], torch.zeros(1,6).float(), poses[len(imgs)//2:]])

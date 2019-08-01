@@ -6,6 +6,7 @@ from path import Path
 import datetime
 from collections import OrderedDict
 from matplotlib import cm
+import sys
 from matplotlib.colors import ListedColormap, LinearSegmentedColormap
 
 
@@ -149,32 +150,7 @@ def intrinsics_pred_decode(input):
 
 
 if __name__ == '__main__':
-    ia = [[11.1, 12.1, 13.1, 14.1],
-          [11.2, 12.2, 13.2, 14.2],
-          [11.3, 12.3, 13.3, 14.3],
-          [11.4, 12.4, 13.4, 14.4],
-          [11.5, 12.5, 13.5, 14.5]]
-    ian = np.array(ia)
-    iant = torch.from_numpy(ian)
-    iant = iant.to(torch.device("cuda"))
-
-    print(iant.shape)
-    # torch.unsqueeze(iant, 0)
-    ##==============================================
-    ja = []
-    for i in range(iant.shape[0]):
-        ja.append([0.0, 0.0, 0.0, 0.0, 1.0])
-    jan = np.array(ja)
-    jant = torch.from_numpy(jan)
-    jant = jant.to(iant.device)
-
-    iante = torch.cat((iant, jant), 1)
-    index = [0, 4, 2, 5, 1, 3, 6, 7, 8]
-    for i in range(iant.shape[0]):
-        iante[i] =iante[i][index]
-
-    ianter = iante.reshape(5, 3, 3)
+    print(sys.platform)
 
 
-    print(ianter.shape)
-    # iant.expand(2,2)
+

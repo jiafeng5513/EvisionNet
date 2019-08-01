@@ -57,6 +57,39 @@ EvisonNet
 |:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
 |0.0160, std: 0.0090|0.0130, std: 0.0090|0.183 |1.595 |6.70   |0.270 |0.734 |0.902 |0.959 | BEST |
 
+ -b 4 -m 0.6 -s 0.1 --epoch-size 3000 --sequence-length 3 --intri_pred --log-output
+Results with scale factor determined by PoseNet : 
+  abs_diff,    abs_rel,     sq_rel,        rms,    log_rms,    abs_log,         a1,         a2,         a3
+    5.1501,     0.3501,     5.9036,     8.2467,     0.4078,     0.3146,     0.5450,     0.7858,     0.8829
+Results with scale factor determined by GT/prediction ratio (like the original paper) : 
+  abs_diff,    abs_rel,     sq_rel,        rms,    log_rms,    abs_log,         a1,         a2,         a3
+    3.9069,     0.2330,     2.4643,     6.8293,     0.3138,     0.2219,     0.6704,     0.8687,     0.9398
+    
+seq09        ATE,         RE
+mean         0.0312,     0.0240
+std          0.0217,     0.0228
+seq10        ATE,         RE
+mean         0.0237,     0.0194
+std          0.0208,     0.0245
+
+ -b 4 -m 0.6 -s 0.1 --epoch-size 3000 --sequence-length 3 --log-output
+Results with scale factor determined by PoseNet : 
+  abs_diff,    abs_rel,     sq_rel,        rms,    log_rms,    abs_log,         a1,         a2,         a3
+    5.2557,     0.3489,     5.2512,     8.3802,     0.4243,     0.3340,     0.5234,     0.7681,     0.8690
+Results with scale factor determined by GT/prediction ratio (like the original paper) : 
+  abs_diff,    abs_rel,     sq_rel,        rms,    log_rms,    abs_log,         a1,         a2,         a3
+    3.8128,     0.2274,     2.3344,     6.7983,     0.3101,     0.2162,     0.6772,     0.8779,     0.9450
+
+seq09        ATE,         RE
+mean         0.0098,     0.0018
+std          0.0054,     0.0011
+
+seq10        ATE,         RE
+mean         0.0092,     0.0020
+std          0.0068,     0.0013
+
+
+
 
 ### 7.评价指标说明
 1. 深度指标:<br>
