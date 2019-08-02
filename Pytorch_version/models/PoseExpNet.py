@@ -1,7 +1,6 @@
 import torch
 import torch.nn as nn
 from torch import sigmoid
-import numpy as np
 from torch.nn.init import xavier_uniform_, zeros_
 
 
@@ -18,24 +17,6 @@ def upconv(in_planes, out_planes):
         nn.ReLU(inplace=True)
     )
 
-
-def intrinsics_decode(input):
-    """
-    https://www.jianshu.com/p/f1bd4ff84926
-    :param input:
-    :return:
-    """
-
-    i = torch.LongTensor([[0, 0, 0, 0, 1, 1, 1, 1, 2, 2, 2, 2, 3, 3, 3, 3],
-                          [0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1],
-                          [0, 1, 2, 2, 0, 1, 2, 2, 0, 1, 2, 2, 0, 1, 2, 2]]).to(input.device)
-    intrinsics = torch.sparse.FloatTensor(i, input.reshape(16), torch.Size([4, 3, 3])).to_dense()
-    intrinsics[0][2][2] = 1
-    intrinsics[1][2][2] = 1
-    intrinsics[2][2][2] = 1
-    intrinsics[3][2][2] = 1
-
-    return intrinsics
 
 class PoseExpNet(nn.Module):
 
@@ -105,9 +86,6 @@ class PoseExpNet(nn.Module):
         out_conv10 = self.conv10(out_conv9)
         out_conv11 = self.conv11(out_conv10)
         intrinsics = self.intr_pred(out_conv11)
-
-        #intrinsics = intrinsics_decode(intrinsics.view(intrinsics.size(0),4))
-
 
         if self.output_exp:
             out_upconv5 = self.upconv5(out_conv5  )[:, :, 0:out_conv4.size(2), 0:out_conv4.size(3)]

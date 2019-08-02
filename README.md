@@ -52,43 +52,20 @@ EvisonNet
 [17]. [tqdm.postfix](https://zhen8838.github.io/2019/01/25/tqdm-fmt/).<br>
 
 ### 6.性能记录
+#### 表1:性能指标
+* seq 09和seq 10是ego-motion的指标(smaller the better).<br>
+* 其余是单目深度的指标(for Abs Rel,Sq Rel,rms,log_rms,smaller the better;for A1,A2,A3,bigger the better).<br>
 
-|seq 09|seq 10|Abs Rel|Sq Rel|rms|log_rms|A1|A2|A3|备注|
-|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
-|0.0160, std: 0.0090|0.0130, std: 0.0090|0.183 |1.595 |6.70   |0.270 |0.734 |0.902 |0.959 | BEST |
+|seq 09             |seq 10                       |abs_diff|Abs Rel|Sq Rel|rms  |log_rms|abs_log|A1    |A2    |A3    |备注|
+|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
+|mean:0.0160, std: 0.0090|mean:0.0130, std: 0.0090|---     |0.183  |1.595 |6.70 |0.270  |---    |0.734 |0.902 |0.959 | BEST<sup>1</sup> |
+|mean:0.0098, std: 0.0054|mean:0.0092, std: 0.0068|3.8128  |0.2274 |2.334 |6.80 |0.310  |0.2162 |0.677 |0.878 |0.945 | BEST<sup>2</sup> |
+|mean:0.0312, std: 0.0217|mean:0.0237, std: 0.0208|3.9069  |0.2330 |2.4643|6.83 |0.314  |0.2219 |0.6704|0.869 |0.940 | intri_pred<sup>3</sup>|
 
- -b 4 -m 0.6 -s 0.1 --epoch-size 3000 --sequence-length 3 --intri_pred --log-output
-Results with scale factor determined by PoseNet : 
-  abs_diff,    abs_rel,     sq_rel,        rms,    log_rms,    abs_log,         a1,         a2,         a3
-    5.1501,     0.3501,     5.9036,     8.2467,     0.4078,     0.3146,     0.5450,     0.7858,     0.8829
-Results with scale factor determined by GT/prediction ratio (like the original paper) : 
-  abs_diff,    abs_rel,     sq_rel,        rms,    log_rms,    abs_log,         a1,         a2,         a3
-    3.9069,     0.2330,     2.4643,     6.8293,     0.3138,     0.2219,     0.6704,     0.8687,     0.9398
-    
-seq09        ATE,         RE
-mean         0.0312,     0.0240
-std          0.0217,     0.0228
-seq10        ATE,         RE
-mean         0.0237,     0.0194
-std          0.0208,     0.0245
-
- -b 4 -m 0.6 -s 0.1 --epoch-size 3000 --sequence-length 3 --log-output
-Results with scale factor determined by PoseNet : 
-  abs_diff,    abs_rel,     sq_rel,        rms,    log_rms,    abs_log,         a1,         a2,         a3
-    5.2557,     0.3489,     5.2512,     8.3802,     0.4243,     0.3340,     0.5234,     0.7681,     0.8690
-Results with scale factor determined by GT/prediction ratio (like the original paper) : 
-  abs_diff,    abs_rel,     sq_rel,        rms,    log_rms,    abs_log,         a1,         a2,         a3
-    3.8128,     0.2274,     2.3344,     6.7983,     0.3101,     0.2162,     0.6772,     0.8779,     0.9450
-
-seq09        ATE,         RE
-mean         0.0098,     0.0018
-std          0.0054,     0.0011
-
-seq10        ATE,         RE
-mean         0.0092,     0.0020
-std          0.0068,     0.0013
-
-
+#### 附表1:备注
+1. Best result in SfMLearner(参考文献[5]).<br>
+2. 复现SfMLearner并改进, `-b 4 -m 0.6 -s 0.1 --epoch-size 3000 --sequence-length 3`.<br>
+3. 不提供内参,`-b 4 -m 0.6 -s 0.1 --epoch-size 3000 --sequence-length 3`.<br>
 
 
 ### 7.评价指标说明

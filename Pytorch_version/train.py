@@ -8,10 +8,8 @@ import torch.backends.cudnn as cudnn
 import torch.optim
 import torch.utils.data
 import models, custom_transforms
-from my_utils import tensor2array, save_checkpoint, save_path_formatter, log_output_tensorboard, intrinsics_pred_decode
-
+from my_utils import tensor2array, save_checkpoint, save_path_formatter, log_output_tensorboard, intrinsics_pred_decode,AverageMeter
 from loss_functions import photometric_reconstruction_loss, explainability_loss, smooth_loss, compute_errors
-from logger import AverageMeter
 from tensorboardX import SummaryWriter
 from tqdm import tqdm
 

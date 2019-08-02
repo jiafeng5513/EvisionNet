@@ -6,7 +6,6 @@ from path import Path
 import datetime
 from collections import OrderedDict
 from matplotlib import cm
-import sys
 from matplotlib.colors import ListedColormap, LinearSegmentedColormap
 
 
@@ -133,24 +132,34 @@ def intrinsics_pred_decode(input):
         iante[i] =iante[i][index]
 
     ianter = iante.reshape(input.shape[0], 3, 3)
-
-
-    #print(ianter.shape)
     return ianter
 
-    # i = torch.LongTensor([[0, 0, 0, 0, 1, 1, 1, 1, 2, 2, 2, 2, 3, 3, 3, 3],
-    #                       [0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1],
-    #                       [0, 1, 2, 2, 0, 1, 2, 2, 0, 1, 2, 2, 0, 1, 2, 2]]).to(input.device)
-    #
-    # intrinsics = torch.sparse.FloatTensor(i, input.reshape(16), torch.Size([4, 3, 3])).to_dense()
-    # intrinsics[0][2][2] = 1
-    # intrinsics[1][2][2] = 1
-    # intrinsics[2][2][2] = 1
-    # intrinsics[3][2][2] = 1
 
+class AverageMeter(object):
+    """Computes and stores the average and current value"""
 
-if __name__ == '__main__':
-    print(sys.platform)
+    def __init__(self, i=1, precision=3):
+        self.meters = i
+        self.precision = precision
+        self.reset(self.meters)
 
+    def reset(self, i):
+        self.val = [0] * i
+        self.avg = [0] * i
+        self.sum = [0] * i
+        self.count = 0
 
+    def update(self, val, n=1):
+        if not isinstance(val, list):
+            val = [val]
+        assert (len(val) == self.meters)
+        self.count += n
+        for i, v in enumerate(val):
+            self.val[i] = v
+            self.sum[i] += v * n
+            self.avg[i] = self.sum[i] / self.count
 
+    def __repr__(self):
+        val = ' '.join(['{:.{}f}'.format(v, self.precision) for v in self.val])
+        avg = ' '.join(['{:.{}f}'.format(a, self.precision) for a in self.avg])
+        return '{}({})'.format(val, avg)
