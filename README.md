@@ -1,7 +1,8 @@
-EvisonNet
+EvisonNet2.0
 =====
 #### 使用无监督方法同时进行相机的标定,运动估计,深度估计
 #### 可能的应用:算法防抖,基于互联网视频的三维重建.
+#### 使用ASPP处理多尺度,取消大型的解码器网络,网络结构加深的地方引入残差层,同一训练和测试的输出
 ## FBI WARNING!!
 警告:谨慎参考和使用,未完成工作,BUG较多,随意使用有BOOM风险.
 ### 1. 目录说明<br>
@@ -26,6 +27,8 @@ EvisonNet
 [9]. DeepCalib: a deep learning approach for automatic intrinsic calibration of wide field-of-view cameras.[关键词:Camera Calibrate deep learning].<br>
 [10]. Depth from Videos in the Wild:Unsupervised Monocular Depth Learning from Unknown Cameras.<br>
 [11]. A Flexible New Technique for Camera Calibratio[张氏标定].<br>
+[12]. A Large Dataset to Train Convolutional Networks for Disparity, Optical Flow, and Scene Flow Estimation.[Evision1.0]<br>
+[13]. Deep Ordinal Regression Network for Monocular Depth Estimation.[Evision2.0]<br>
 ### 4. 参考项目
 [1]. [EdgeConnect](https://github.com/knazeri/edge-connect).<br>
 [2]. [Cycled-GAN](https://github.com/andrea-pilzer/unsup-stereo-depthGAN/).<br>
