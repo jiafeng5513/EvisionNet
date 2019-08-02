@@ -6,14 +6,15 @@ import torch
 import torch.backends.cudnn as cudnn
 import torch.optim
 import torch.utils.data
-from Pytorch_version import models, custom_transforms
-from Pytorch_version.my_utils import save_checkpoint,save_path_formatter
-from Pytorch_version.logger import TermLogger, AverageMeter
+import models, custom_transforms
+from my_utils import save_checkpoint,save_path_formatter
+from my_utils import AverageMeter
+#from Modle1.0.logger import TermLogger, AverageMeter
 from itertools import chain
 from tensorboardX import SummaryWriter
 from datasets.shifted_sequence_folders import ShiftedSequenceFolder
-from Pytorch_version.datasets.sequence_folders import SequenceFolder
-from Pytorch_version.train import train, validate_with_gt, validate_without_gt, parser
+from datasets.sequence_folders import SequenceFolder
+from train import train, validate_with_gt, validate_without_gt, parser
 
 parser.add_argument('-d', '--target-displacement', type=float, help='displacement to aim at when adjustting shifts, regarding posenet output',
                     metavar='D', default=0.05)
@@ -62,7 +63,7 @@ def main():
 
     # if no Groundtruth is avalaible, Validation set is the same type as training set to measure photometric loss from warping
     if args.with_gt:
-        from Pytorch_version.datasets.validation_folders import ValidationSet
+        from datasets.validation_folders import ValidationSet
         val_set = ValidationSet(
             args.data,
             transform=valid_transform

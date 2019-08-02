@@ -2,7 +2,7 @@ from __future__ import division
 import torch
 from torch import nn
 import torch.nn.functional as F
-from Pytorch_version.inverse_warp import inverse_warp
+from inverse_warp import inverse_warp
 
 
 def photometric_reconstruction_loss(tgt_img, ref_imgs, intrinsics,

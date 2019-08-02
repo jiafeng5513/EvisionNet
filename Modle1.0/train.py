@@ -66,9 +66,9 @@ def main():
     global best_error, n_iter, device
     args = parser.parse_args()
     if args.dataset_format == 'stacked':
-        from Pytorch_version.datasets.stacked_sequence_folders import SequenceFolder
+        from datasets.stacked_sequence_folders import SequenceFolder
     elif args.dataset_format == 'sequential':
-        from Pytorch_version.datasets.sequence_folders import SequenceFolder
+        from datasets.sequence_folders import SequenceFolder
     save_path = save_path_formatter(args, parser)
     if sys.platform is 'win32':
         args.save_path = '.\checkpoints' / save_path
@@ -105,7 +105,7 @@ def main():
     # if no Groundtruth is avalaible,
     # Validation set is the same type as training set to measure photometric loss from warping
     if args.with_gt:
-        from Pytorch_version.datasets.validation_folders import ValidationSet
+        from datasets.validation_folders import ValidationSet
         val_set = ValidationSet(
             args.data,
             transform=valid_transform
