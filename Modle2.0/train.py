@@ -133,7 +133,7 @@ def main():
     # create model
     print("=> creating model")
 
-    disp_net = models.DispNetS().to(device)
+    disp_net = models.DispNet2(pretrained=False).to(device)
     output_exp = args.mask_loss_weight > 0
     if not output_exp:
         print("=> no mask loss, PoseExpnet will only output pose")
@@ -151,12 +151,10 @@ def main():
         print("=> using pre-trained weights for Dispnet")
         weights = torch.load(args.pretrained_disp)
         disp_net.load_state_dict(weights['state_dict'])
-    else:
-        disp_net.init_weights()
+    # else:
+    #     disp_net.init_weights()
 
-    cudnn.benchmark = True
-    disp_net = torch.nn.DataParallel(disp_net)
-    pose_exp_net = torch.nn.DataParallel(pose_exp_net)
+
 
     print('=> setting adam solver')
 
@@ -164,7 +162,13 @@ def main():
         {'params': disp_net.parameters(), 'lr': args.lr},
         {'params': pose_exp_net.parameters(), 'lr': args.lr}
     ]
-    optimizer = torch.optim.Adam(optim_params, betas=(args.momentum, args.beta), weight_decay=args.weight_decay)
+    train_params = [{'params': disp_net.get_1x_lr_params(), 'lr': args.lr},
+                    {'params': disp_net.get_10x_lr_params(), 'lr': args.lr * 10}]
+    optimizer = torch.optim.Adam(train_params, betas=(args.momentum, args.beta), weight_decay=args.weight_decay)
+
+    cudnn.benchmark = True
+    disp_net = torch.nn.DataParallel(disp_net)
+    pose_exp_net = torch.nn.DataParallel(pose_exp_net)
 
     with open(args.save_path / args.log_summary, 'w') as csvfile:
         writer = csv.writer(csvfile, delimiter='\t')
@@ -254,7 +258,7 @@ def train(args, train_loader, disp_net, pose_exp_net, optimizer, epoch_size, tb_
         intrinsics = intrinsics.to(device)
 
         # compute output
-        disparities = disp_net(tgt_img)
+        disparities = disp_net(tgt_img)  #
         depth = [1 / disp for disp in disparities]
         explainability_mask, pose, intrinsics_pred = pose_exp_net(tgt_img, ref_imgs)
 

@@ -105,6 +105,7 @@ class PoseExpNet(nn.Module):
             exp_mask1 = None
 
         if self.training:
-            return [exp_mask1, exp_mask2, exp_mask3, exp_mask4], pose, intrinsics
+            #return [exp_mask1, exp_mask2, exp_mask3, exp_mask4], pose, intrinsics
+            return exp_mask1, pose, intrinsics
         else:
             return exp_mask1, pose, intrinsics
