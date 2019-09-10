@@ -8,7 +8,8 @@ import torch.backends.cudnn as cudnn
 import torch.optim
 import torch.utils.data
 import models, custom_transforms
-from my_utils import tensor2array, save_checkpoint, save_path_formatter, log_output_tensorboard, intrinsics_pred_decode,AverageMeter
+from my_utils import tensor2array, save_checkpoint, save_path_formatter, log_output_tensorboard, intrinsics_pred_decode, \
+    AverageMeter
 from loss_functions import photometric_reconstruction_loss, explainability_loss, smooth_loss, compute_errors
 from tensorboardX import SummaryWriter
 from tqdm import tqdm
@@ -120,12 +121,10 @@ def main():
         )
     print('{} samples found in {} train scenes'.format(len(train_set), len(train_set.scenes)))
     print('{} samples found in {} valid scenes'.format(len(val_set), len(val_set.scenes)))
-    train_loader = torch.utils.data.DataLoader(
-        train_set, batch_size=args.batch_size, shuffle=True,
-        num_workers=args.workers, pin_memory=True)
-    val_loader = torch.utils.data.DataLoader(
-        val_set, batch_size=args.batch_size, shuffle=False,
-        num_workers=args.workers, pin_memory=True)
+    train_loader = torch.utils.data.DataLoader(train_set, batch_size=args.batch_size, shuffle=True,
+                                               num_workers=args.workers, pin_memory=True)
+    val_loader = torch.utils.data.DataLoader(val_set, batch_size=args.batch_size, shuffle=False,
+                                             num_workers=args.workers, pin_memory=True)
 
     if args.epoch_size == 0:
         args.epoch_size = len(train_loader)
@@ -137,8 +136,7 @@ def main():
     output_exp = args.mask_loss_weight > 0
     if not output_exp:
         print("=> no mask loss, PoseExpnet will only output pose")
-    pose_exp_net = models.PoseExpNet(nb_ref_imgs=args.sequence_length - 1, output_exp=args.mask_loss_weight > 0).to(
-        device)
+    pose_exp_net = models.PoseExpNet(nb_ref_imgs=args.sequence_length - 1, output_exp=args.mask_loss_weight > 0).to(device)
 
     if args.pretrained_exp_pose:
         print("=> using pre-trained weights for explainabilty and pose net")
@@ -154,7 +152,9 @@ def main():
     # else:
     #     disp_net.init_weights()
 
-
+    cudnn.benchmark = True
+    disp_net = torch.nn.DataParallel(disp_net)
+    pose_exp_net = torch.nn.DataParallel(pose_exp_net)
 
     print('=> setting adam solver')
 
@@ -162,13 +162,12 @@ def main():
         {'params': disp_net.parameters(), 'lr': args.lr},
         {'params': pose_exp_net.parameters(), 'lr': args.lr}
     ]
-    train_params = [{'params': disp_net.get_1x_lr_params(), 'lr': args.lr},
-                    {'params': disp_net.get_10x_lr_params(), 'lr': args.lr * 10}]
-    optimizer = torch.optim.Adam(train_params, betas=(args.momentum, args.beta), weight_decay=args.weight_decay)
+    # train_params = [{'params': disp_net.get_1x_lr_params(), 'lr': args.lr},
+    #                 {'params': disp_net.get_10x_lr_params(), 'lr': args.lr * 10},
+    #                 {'params': pose_exp_net.parameters(), 'lr': args.lr}]
 
-    cudnn.benchmark = True
-    disp_net = torch.nn.DataParallel(disp_net)
-    pose_exp_net = torch.nn.DataParallel(pose_exp_net)
+
+    optimizer = torch.optim.Adam(optim_params, betas=(args.momentum, args.beta), weight_decay=args.weight_decay)
 
     with open(args.save_path / args.log_summary, 'w') as csvfile:
         writer = csv.writer(csvfile, delimiter='\t')

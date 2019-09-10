@@ -95,6 +95,7 @@ class FullImageEncoder(nn.Module):
         self.relu = nn.ReLU(inplace=True)
         self.conv1 = nn.Conv2d(512, 512, 1)  # 1x1 卷积
         self.upsample = nn.UpsamplingBilinear2d(size=(16, 52))
+        #self.upsample = nn.functional.interpolate(size=(16, 52))
 
         weights_init(self.modules(), 'xavier')
 
@@ -149,6 +150,7 @@ class SceneUnderstandingModule(nn.Module):
             nn.Conv2d(2048, 142, 1),  # KITTI 142 NYU 136 In paper, K = 80 is best, so use 160 is good!
             # nn.UpsamplingBilinear2d(scale_factor=8)
             nn.UpsamplingBilinear2d(size=(128, 416))
+            #nn.functional.interpolate(size=(128, 416))
         )
 
         weights_init(self.modules(), type='xavier')

@@ -9,11 +9,11 @@ def photometric_reconstruction_loss(tgt_img, ref_imgs, intrinsics,
                                     depth, explainability_mask, pose,
                                     rotation_mode='euler', padding_mode='zeros'):
     def one_scale(depth, explainability_mask):
-        assert(explainability_mask is None or depth.size()[2:] == explainability_mask.size()[2:])
+        assert(explainability_mask is None or depth.size()[1:] == explainability_mask.size()[2:])
         assert(pose.size(1) == len(ref_imgs))
 
         reconstruction_loss = 0
-        b, _, h, w = depth.size()
+        b, h, w = depth.size()
         downscale = tgt_img.size(2)/h
 
         tgt_img_scaled = F.interpolate(tgt_img, (h, w), mode='area')
@@ -26,7 +26,7 @@ def photometric_reconstruction_loss(tgt_img, ref_imgs, intrinsics,
         for i, ref_img in enumerate(ref_imgs_scaled):
             current_pose = pose[:, i]
 
-            ref_img_warped, valid_points = inverse_warp(ref_img, depth[:,0], current_pose,
+            ref_img_warped, valid_points = inverse_warp(ref_img, depth, current_pose,
                                                         intrinsics_scaled,
                                                         rotation_mode, padding_mode)
             diff = (tgt_img_scaled - ref_img_warped) * valid_points.unsqueeze(1).float()
