@@ -258,7 +258,8 @@ def train(args, train_loader, disp_net, pose_exp_net, optimizer, epoch_size, tb_
 
         # compute output
         disparities = disp_net(tgt_img)  #
-        depth = [1 / disp for disp in disparities]
+        #depth = [1 / disp for disp in disparities]
+        depth =disparities
         explainability_mask, pose, intrinsics_pred = pose_exp_net(tgt_img, ref_imgs)
 
         if args.intri_pred:

@@ -32,11 +32,11 @@ def pixel2cam(depth, intrinsics_inv):
     Returns:
         array of (u,v,1) cam coordinates -- [B, 3, H, W]
     """
-    b, h, w = depth.size()
+    b, h, w = depth.size()  # I Need a depth with b=3,but offer 1
     if (pixel_coords is None) or pixel_coords.size(2) < h:
         set_id_grid(depth)
     current_pixel_coords = pixel_coords[:,:,:h,:w].expand(b,3,h,w).reshape(b, 3, -1)  # [B, 3, H*W]
-    cam_coords = (intrinsics_inv @ current_pixel_coords.float()).reshape(b, 3, h, w)  # add by jiafeng5513 in 9-10 [.float]
+    cam_coords = (intrinsics_inv @ current_pixel_coords).reshape(b, 3, h, w)  # add by jiafeng5513 in 9-10 [.float]
     return cam_coords * depth.unsqueeze(1)
 
 

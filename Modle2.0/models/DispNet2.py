@@ -6,7 +6,7 @@ from torch.nn.init import xavier_uniform_, zeros_
 import torchvision.models
 import collections
 import math
-from .resnet import *
+from resnet import *
 
 
 
@@ -200,7 +200,7 @@ class OrdinalRegressionLayer(nn.Module):
 
         ord_c1 = ord_c[:, 1, :].clone()
         ord_c1 = ord_c1.view(-1, ord_num, H, W)
-        decode_c = torch.sum((ord_c1 > 0.5), dim=1).view(-1, 1, H, W)
+        decode_c = torch.sum((ord_c1 > 0.5), dim=1,dtype=torch.float32).view(-1, 1, H, W)  # pay attention to the dtype of torch.sum()
         return decode_c, ord_c1  # [1, 1, 128, 416]，[1, 71, 128, 416]
 
 
@@ -248,6 +248,6 @@ if __name__ == "__main__":
     image = torch.randn(1, 3, 128, 416)  # 输入尺寸
     image = image.cuda()
     with torch.no_grad():
-        out0, out1 = model(image)
+        out0 = model(image)
     print('out0 size:', out0.size())
-    print('out1 size:', out1.size())
+   # print('out1 size:', out1.size())
