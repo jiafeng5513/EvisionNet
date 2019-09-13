@@ -94,9 +94,8 @@ class FullImageEncoder(nn.Module):
         self.global_fc = nn.Linear(2048 * 3 * 14, 512)  # 3 * 14
         self.relu = nn.ReLU(inplace=True)
         self.conv1 = nn.Conv2d(512, 512, 1)  # 1x1 卷积
-        self.upsample = nn.UpsamplingBilinear2d(size=(16, 52))
-        #self.upsample = nn.functional.interpolate(size=(16, 52))
-
+        # self.upsample = nn.UpsamplingBilinear2d(size=(16, 52))
+        #self.upsample = nn.functional.interpolate(size=(16, 52), mode='bilinear', align_corners=True)
         weights_init(self.modules(), 'xavier')
 
     def forward(self, x):
@@ -110,7 +109,7 @@ class FullImageEncoder(nn.Module):
         x4 = x4.view(-1, 512, 1, 1)
         # print('# x4 size:', x4.size())
         x5 = self.conv1(x4)
-        out = self.upsample(x5)
+        out = nn.functional.interpolate(input=x5, size=(16, 52), mode='bilinear', align_corners=True)  # UpsamplingBilinear2d
         return out
 
 
@@ -149,8 +148,8 @@ class SceneUnderstandingModule(nn.Module):
             nn.Dropout2d(p=0.5),
             nn.Conv2d(2048, 142, 1),  # KITTI 142 NYU 136 In paper, K = 80 is best, so use 160 is good!
             # nn.UpsamplingBilinear2d(scale_factor=8)
-            nn.UpsamplingBilinear2d(size=(128, 416))
-            #nn.functional.interpolate(size=(128, 416))
+            # nn.UpsamplingBilinear2d(size=(128, 416))
+            #nn.functional.interpolate(size=(128, 416), mode='bilinear', align_corners=True)
         )
 
         weights_init(self.modules(), type='xavier')
@@ -165,7 +164,8 @@ class SceneUnderstandingModule(nn.Module):
 
         x6 = torch.cat((x1, x2, x3, x4, x5), dim=1)
         # print('cat x6 size:', x6.size())
-        out = self.concat_process(x6)
+        x7 = self.concat_process(x6)
+        out = nn.functional.interpolate(input=x7, size=(128, 416), mode='bilinear', align_corners=True)
         return out
 
 
