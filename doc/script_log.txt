@@ -23,3 +23,6 @@ Pytorch_version/checkpoints/KittiRaw_formatted,m0.6/07-29-0949/exp_pose_model_be
 python3 test_disp.py --pretrained-dispnet /home/RAID1/Projects/EvisionNet/Pytorch_version/checkpoints/KittiRaw_formatted,m0.6/07-29-0949/dispnet_model_best.pth.tar --pretrained-posenet /home/RAID1/Projects/EvisionNet/Pytorch_version/checkpoints/KittiRaw_formatted,m0.6/07-29-0949/exp_pose_model_best.pth.tar --dataset-dir /home/RAID1/DataSet/KITTI/KittiRaw/ --dataset-list /home/RAID1/Projects/EvisionNet/Pytorch_version/kitti_eval/test_files_eigen.txt
 
 python3 test_pose.py /home/RAID1/Projects/EvisionNet/Pytorch_version/checkpoints/KittiRaw_formatted,m0.6/07-29-0949/exp_pose_model_best.pth.tar --dataset-dir /home/RAID1/DataSet/KITTI/KittiOdometry/ --sequences 09
+
+
+python3 test_pose.py /home/RAID1/Projects/EvisionNet/Pytorch_version/checkpoints/KittiRaw_formatted,m0.6/07-29-0949/exp_pose_model_best.pth.tar --dataset-dir /home/RAID1/DataSet/KITTI/KittiOdometry/ --sequences 09

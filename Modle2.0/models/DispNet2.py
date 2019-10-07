@@ -6,7 +6,7 @@ from torch.nn.init import xavier_uniform_, zeros_
 import torchvision.models
 import collections
 import math
-from resnet import *
+from .resnet import *
 
 
 
