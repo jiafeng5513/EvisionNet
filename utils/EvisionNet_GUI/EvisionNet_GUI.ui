@@ -33,7 +33,7 @@
     <item row="0" column="0">
      <widget class="QTabWidget" name="tabWidget">
       <property name="currentIndex">
-       <number>1</number>
+       <number>0</number>
       </property>
       <widget class="QWidget" name="tab">
        <attribute name="title">
@@ -54,7 +54,7 @@
             </widget>
            </item>
            <item row="0" column="1">
-            <widget class="QLineEdit" name="lineEdit_2"/>
+            <widget class="QLineEdit" name="lineEdit_TimeStamp"/>
            </item>
            <item row="1" column="0">
             <widget class="QLabel" name="label_3">
@@ -64,30 +64,30 @@
             </widget>
            </item>
            <item row="1" column="1">
-            <widget class="QLineEdit" name="lineEdit_3"/>
+            <widget class="QLineEdit" name="lineEdit_Data"/>
            </item>
            <item row="2" column="0">
-            <widget class="QLabel" name="label_4">
+            <widget class="QLabel" name="label_Specifier">
              <property name="text">
               <string>Specifier:</string>
              </property>
             </widget>
            </item>
            <item row="2" column="1">
-            <widget class="QLineEdit" name="lineEdit_4"/>
+            <widget class="QLineEdit" name="lineEdit_Specifier"/>
            </item>
           </layout>
          </widget>
         </item>
         <item row="0" column="2">
-         <widget class="QPushButton" name="pushButton">
+         <widget class="QPushButton" name="pushButton_brewse">
           <property name="text">
            <string>browse</string>
           </property>
          </widget>
         </item>
         <item row="0" column="3">
-         <widget class="QPushButton" name="pushButton_3">
+         <widget class="QPushButton" name="pushButton_UP">
           <property name="text">
            <string>UP</string>
           </property>
@@ -101,17 +101,17 @@
          </widget>
         </item>
         <item row="0" column="1">
-         <widget class="QLineEdit" name="lineEdit"/>
+         <widget class="QLineEdit" name="lineEdit_LogFolder"/>
         </item>
         <item row="0" column="4">
-         <widget class="QPushButton" name="pushButton_4">
+         <widget class="QPushButton" name="pushButton_DOWN">
           <property name="text">
            <string>DOWN</string>
           </property>
          </widget>
         </item>
         <item row="2" column="4">
-         <widget class="QPushButton" name="pushButton_2">
+         <widget class="QPushButton" name="pushButton_OpenTensorBoard">
           <property name="text">
            <string>Open TensorBoard</string>
           </property>
@@ -268,7 +268,7 @@ font: 11pt &quot;Microsoft JhengHei&quot;;</string>
      <x>0</x>
      <y>0</y>
      <width>807</width>
-     <height>23</height>
+     <height>28</height>
     </rect>
    </property>
   </widget>
