@@ -829,3 +829,4 @@ utils/Tensorflow_version/Core/test_output/
 将删除 Net/checkpoints/model-191178.index
 将删除 Net/checkpoints/model.latest.data-00000-of-00001
 将删除 Net/checkpoints/model.latest.index
+/utils/EvisionNet_GUI/EvisionNet_GUI.ui
