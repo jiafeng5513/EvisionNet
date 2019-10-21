@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>834</width>
-    <height>542</height>
+    <width>923</width>
+    <height>560</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -33,7 +33,7 @@
     <item row="0" column="0">
      <widget class="QTabWidget" name="tabWidget">
       <property name="currentIndex">
-       <number>0</number>
+       <number>2</number>
       </property>
       <widget class="QWidget" name="tab">
        <attribute name="title">
@@ -68,26 +68,26 @@
             </widget>
            </item>
            <item row="1" column="1">
-            <widget class="QLineEdit" name="lineEdit_3"/>
+            <widget class="QLineEdit" name="lineEdit_Data"/>
            </item>
            <item row="0" column="1">
-            <widget class="QLineEdit" name="lineEdit_2"/>
+            <widget class="QLineEdit" name="lineEdit_TimeStamp"/>
            </item>
            <item row="2" column="1">
-            <widget class="QLineEdit" name="lineEdit_4"/>
+            <widget class="QLineEdit" name="lineEdit_Specifier"/>
            </item>
           </layout>
          </widget>
         </item>
         <item row="0" column="4">
-         <widget class="QPushButton" name="pushButton_4">
+         <widget class="QPushButton" name="pushButton_Down">
           <property name="text">
            <string>DOWN</string>
           </property>
          </widget>
         </item>
         <item row="0" column="2">
-         <widget class="QPushButton" name="pushButton_browse">
+         <widget class="QPushButton" name="pushButton_Browse">
           <property name="text">
            <string>browse</string>
           </property>
@@ -101,7 +101,7 @@
          </widget>
         </item>
         <item row="3" column="4">
-         <widget class="QPushButton" name="pushButton_2">
+         <widget class="QPushButton" name="pushButton_OpenTensorBoard">
           <property name="text">
            <string>Open TensorBoard</string>
           </property>
@@ -121,10 +121,10 @@
          </spacer>
         </item>
         <item row="0" column="1">
-         <widget class="QLineEdit" name="lineEdit"/>
+         <widget class="QLineEdit" name="lineEdit_LogFolder"/>
         </item>
         <item row="0" column="3">
-         <widget class="QPushButton" name="pushButton_3">
+         <widget class="QPushButton" name="pushButton_Up">
           <property name="text">
            <string>UP</string>
           </property>
@@ -150,7 +150,67 @@
         <string>Training</string>
        </attribute>
        <layout class="QGridLayout" name="gridLayout_6">
-        <item row="0" column="0" colspan="3">
+        <item row="2" column="0">
+         <spacer name="horizontalSpacer_2">
+          <property name="orientation">
+           <enum>Qt::Horizontal</enum>
+          </property>
+          <property name="sizeHint" stdset="0">
+           <size>
+            <width>40</width>
+            <height>20</height>
+           </size>
+          </property>
+         </spacer>
+        </item>
+        <item row="1" column="0" colspan="4">
+         <widget class="QGroupBox" name="groupBox_3">
+          <property name="title">
+           <string>Command Line</string>
+          </property>
+          <layout class="QGridLayout" name="gridLayout_4">
+           <property name="leftMargin">
+            <number>2</number>
+           </property>
+           <property name="topMargin">
+            <number>2</number>
+           </property>
+           <property name="rightMargin">
+            <number>2</number>
+           </property>
+           <property name="bottomMargin">
+            <number>2</number>
+           </property>
+           <property name="spacing">
+            <number>2</number>
+           </property>
+           <item row="0" column="0">
+            <widget class="QPlainTextEdit" name="plainTextEdit">
+             <property name="styleSheet">
+              <string notr="true">background-color: rgb(60, 60, 90);
+color: rgb(170, 255, 255);
+font: 11pt &quot;Microsoft JhengHei&quot;;</string>
+             </property>
+            </widget>
+           </item>
+          </layout>
+         </widget>
+        </item>
+        <item row="2" column="2">
+         <widget class="QPushButton" name="pushButton_6">
+          <property name="text">
+           <string>Check</string>
+          </property>
+         </widget>
+        </item>
+        <item row="2" column="3">
+         <widget class="QPushButton" name="pushButton_5">
+          <property name="text">
+           <string>Run</string>
+          </property>
+         </widget>
+        </item>
+        <item row="0" column="0" colspan="4">
          <widget class="QGroupBox" name="groupBox_2">
           <property name="title">
            <string>Parameters</string>
@@ -173,7 +233,7 @@
             </widget>
            </item>
            <item row="6" column="1">
-            <widget class="QLineEdit" name="lineEdit_25"/>
+            <widget class="QLineEdit" name="lineEdit_LogSummary"/>
            </item>
            <item row="6" column="3">
             <widget class="QPushButton" name="pushButton_21">
@@ -233,7 +293,7 @@
             <widget class="QLineEdit" name="lineEdit_38"/>
            </item>
            <item row="3" column="1">
-            <widget class="QLineEdit" name="lineEdit_24"/>
+            <widget class="QLineEdit" name="lineEdit_PretrainedExppose"/>
            </item>
            <item row="2" column="7">
             <widget class="QLabel" name="label_43">
@@ -338,7 +398,7 @@
             </widget>
            </item>
            <item row="0" column="1">
-            <widget class="QLineEdit" name="lineEdit_22"/>
+            <widget class="QLineEdit" name="lineEdit_TrainingDataPath"/>
            </item>
            <item row="1" column="9">
             <widget class="QLineEdit" name="lineEdit_35"/>
@@ -361,7 +421,7 @@
             <widget class="QComboBox" name="comboBox_7"/>
            </item>
            <item row="2" column="1" colspan="3">
-            <widget class="QLineEdit" name="lineEdit_23"/>
+            <widget class="QLineEdit" name="lineEdit_Workers"/>
            </item>
            <item row="1" column="4">
             <widget class="QLabel" name="label_34">
@@ -391,7 +451,7 @@
             <widget class="QLineEdit" name="lineEdit_34"/>
            </item>
            <item row="1" column="1" colspan="3">
-            <widget class="QComboBox" name="comboBox_5"/>
+            <widget class="QComboBox" name="comboBox_DatasetFormat"/>
            </item>
            <item row="2" column="0">
             <widget class="QLabel" name="label_28">
@@ -404,7 +464,7 @@
             <widget class="QLineEdit" name="lineEdit_28"/>
            </item>
            <item row="7" column="1">
-            <widget class="QLineEdit" name="lineEdit_26"/>
+            <widget class="QLineEdit" name="lineEdit_LogFul"/>
            </item>
            <item row="7" column="0">
             <widget class="QLabel" name="label_31">
@@ -414,7 +474,7 @@
             </widget>
            </item>
            <item row="8" column="1" colspan="3">
-            <widget class="QLineEdit" name="lineEdit_27"/>
+            <widget class="QLineEdit" name="lineEdit_SequenceLength"/>
            </item>
            <item row="8" column="0">
             <widget class="QLabel" name="label_32">
@@ -454,69 +514,16 @@
             <widget class="QLineEdit" name="lineEdit_40"/>
            </item>
            <item row="17" column="1" colspan="3">
-            <widget class="QLineEdit" name="lineEdit_33"/>
+            <widget class="QLineEdit" name="lineEdit_Beta"/>
            </item>
           </layout>
          </widget>
-        </item>
-        <item row="2" column="0">
-         <spacer name="horizontalSpacer_2">
-          <property name="orientation">
-           <enum>Qt::Horizontal</enum>
-          </property>
-          <property name="sizeHint" stdset="0">
-           <size>
-            <width>40</width>
-            <height>20</height>
-           </size>
-          </property>
-         </spacer>
         </item>
         <item row="2" column="1">
-         <widget class="QPushButton" name="pushButton_6">
+         <widget class="QPushButton" name="pushButton">
           <property name="text">
-           <string>Check</string>
+           <string>Default</string>
           </property>
-         </widget>
-        </item>
-        <item row="2" column="2">
-         <widget class="QPushButton" name="pushButton_5">
-          <property name="text">
-           <string>Run</string>
-          </property>
-         </widget>
-        </item>
-        <item row="1" column="0" colspan="3">
-         <widget class="QGroupBox" name="groupBox_3">
-          <property name="title">
-           <string>Command Line</string>
-          </property>
-          <layout class="QGridLayout" name="gridLayout_4">
-           <property name="leftMargin">
-            <number>2</number>
-           </property>
-           <property name="topMargin">
-            <number>2</number>
-           </property>
-           <property name="rightMargin">
-            <number>2</number>
-           </property>
-           <property name="bottomMargin">
-            <number>2</number>
-           </property>
-           <property name="spacing">
-            <number>2</number>
-           </property>
-           <item row="0" column="0">
-            <widget class="QPlainTextEdit" name="plainTextEdit">
-             <property name="styleSheet">
-              <string notr="true">background-color: rgb(60, 60, 90);
-color: rgb(170, 255, 255);
-font: 11pt &quot;Microsoft JhengHei&quot;;</string>
-             </property>
-            </widget>
-           </item>
-          </layout>
          </widget>
         </item>
        </layout>
@@ -1022,7 +1029,7 @@ font: 11pt &quot;Microsoft JhengHei&quot;;</string>
     <rect>
      <x>0</x>
      <y>0</y>
-     <width>834</width>
+     <width>923</width>
      <height>23</height>
     </rect>
    </property>
