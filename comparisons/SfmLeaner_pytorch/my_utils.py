@@ -33,8 +33,6 @@ def save_path_formatter(args, parser):
         value = args_dict[key]
         if not is_default(key, value):
             folder_string.append('{}{}'.format(prefix, value))
-    if args.intri_pred:
-        folder_string.append('calib')
     save_path = Path(','.join(folder_string))
     timestamp = datetime.datetime.now().strftime("%m-%d-%H%M")
     return save_path / timestamp
@@ -111,28 +109,6 @@ def save_checkpoint(save_path, dispnet_state, exp_pose_state, is_best, filename=
         for prefix in file_prefixes:
             shutil.copyfile(save_path / '{}_{}'.format(prefix, filename),
                             save_path / '{}_model_best.pth.tar'.format(prefix))
-
-
-def intrinsics_pred_decode(input):
-    """
-    https://www.jianshu.com/p/f1bd4ff84926
-    :param input:
-    :return:
-    """
-    input = torch.squeeze(input)
-    ja = []
-    for i in range(input.shape[0]):
-        ja.append([0.0, 0.0, 0.0, 0.0, 1.0])
-    jan = np.array(ja)
-    jant = torch.from_numpy(jan)
-    jant = jant.to(input.device).float()
-    iante = torch.cat((input, jant), 1)
-    index = [0, 4, 2, 5, 1, 3, 6, 7, 8]
-    for i in range(input.shape[0]):
-        iante[i] =iante[i][index]
-
-    ianter = iante.reshape(input.shape[0], 3, 3)
-    return ianter
 
 
 class AverageMeter(object):

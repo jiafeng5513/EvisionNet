@@ -16,10 +16,10 @@ EvisonNet
 * CUDA10+cudnn7.5
 * tensorflow 1.13.1
 ### 3.对比实验
-* `depth_from_video_in_the_wild`: [项目](https://github.com/google-research/google-research/tree/master/depth_from_video_in_the_wild) [论文](http://openaccess.thecvf.com/content_ICCV_2019/html/Gordon_Depth_From_Videos_in_the_Wild_Unsupervised_Monocular_Depth_Learning_ICCV_2019_paper.html)
-* `SfmLeaner_pytorch`: [项目](https://github.com/ClementPinard/SfmLearner-Pytorch) [论文](http://openaccess.thecvf.com/content_cvpr_2017/html/Zhou_Unsupervised_Learning_of_CVPR_2017_paper.html)
-* `SfmLeaner_TF`: [项目](https://github.com/tinghuiz/SfMLearner) [论文](http://openaccess.thecvf.com/content_cvpr_2017/html/Zhou_Unsupervised_Learning_of_CVPR_2017_paper.html)
-* `struct2depth`: [项目](https://github.com/tensorflow/models/tree/master/research/struct2depth) [论文](https://wvvw.aaai.org/ojs/index.php/AAAI/article/view/4801)
+* `depth_from_video_in_the_wild`: (unsupervised learning of depth, ego-motion, object motion, and camera intrinsics) [项目](https://github.com/google-research/google-research/tree/master/depth_from_video_in_the_wild) [论文](http://openaccess.thecvf.com/content_ICCV_2019/html/Gordon_Depth_From_Videos_in_the_Wild_Unsupervised_Monocular_Depth_Learning_ICCV_2019_paper.html)
+* `SfmLeaner_pytorch`:(Unsupervised Learning, explainability-mask) [项目](https://github.com/ClementPinard/SfmLearner-Pytorch) [论文](http://openaccess.thecvf.com/content_cvpr_2017/html/Zhou_Unsupervised_Learning_of_CVPR_2017_paper.html)
+* `SfmLeaner_TF`:(Optimized for multiple GPUs) [项目](https://github.com/tinghuiz/SfMLearner) [论文](http://openaccess.thecvf.com/content_cvpr_2017/html/Zhou_Unsupervised_Learning_of_CVPR_2017_paper.html)
+* `struct2depth`: (unsupervised learning of scene depth and robot ego-motion) [项目](https://github.com/tensorflow/models/tree/master/research/struct2depth) [论文](https://wvvw.aaai.org/ojs/index.php/AAAI/article/view/4801)
 ### 4. 参考文献<br>
 [1]. (双目视差)Chang, Jia-Ren, and Yong-Sheng Chen. "Pyramid stereo matching network." Proceedings of the IEEE Conference on Computer Vision and Pattern Recognition. 2018.[PSMNet](https://github.com/JiaRenChang/PSMNet).<br>
 [2]. (特征点匹配并应用于三维重建)Moo Yi K, Verdie Y, Fua P, et al. "Learning to assign orientations to feature points." Proceedings of the IEEE Conference on Computer Vision and Pattern Recognition. 2016: 107-116.[Code](https://github.com/vcg-uvic/benchmark-orientation).<br>
