@@ -6,7 +6,7 @@ import numpy as np
 from path import Path
 import argparse
 from tqdm import tqdm
-
+from skimage import transform,data
 from models import DispNetS, PoseExpNet
 
 
@@ -79,8 +79,8 @@ def main():
 
         h,w,_ = tgt_img.shape
         if (not args.no_resize) and (h != args.img_height or w != args.img_width):
-            tgt_img = imresize(tgt_img, (args.img_height, args.img_width)).astype(np.float32)
-            ref_imgs = [imresize(img, (args.img_height, args.img_width)).astype(np.float32) for img in ref_imgs]
+            tgt_img = transform.resize(tgt_img, (args.img_height, args.img_width), mode='constant', anti_aliasing=True).astype(np.float32)
+            ref_imgs = [transform.resize(img, (args.img_height, args.img_width), mode='constant', anti_aliasing=True).astype(np.float32) for img in ref_imgs]
 
         tgt_img = np.transpose(tgt_img, (2, 0, 1))
         ref_imgs = [np.transpose(img, (2,0,1)) for img in ref_imgs]
@@ -117,7 +117,7 @@ def main():
             middle_index = seq_length//2
             tgt = ref_imgs[middle_index]
             reorganized_refs = ref_imgs[:middle_index] + ref_imgs[middle_index + 1:]
-            _, poses, _ = pose_net(tgt, reorganized_refs)
+            _, poses = pose_net(tgt, reorganized_refs)
             displacement_magnitudes = poses[0,:,:3].norm(2,1).cpu().numpy()
 
             scale_factor = np.mean(sample['displacements'] / displacement_magnitudes)

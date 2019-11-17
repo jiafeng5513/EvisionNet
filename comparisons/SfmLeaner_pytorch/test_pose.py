@@ -5,7 +5,7 @@ import numpy as np
 from path import Path
 import argparse
 from tqdm import tqdm
-
+from skimage import transform,data
 from models import PoseExpNet
 from inverse_warp import pose_vec2mat
 
@@ -53,7 +53,7 @@ def main():
 
         h,w,_ = imgs[0].shape
         if (not args.no_resize) and (h != args.img_height or w != args.img_width):
-            imgs = [imresize(img, (args.img_height, args.img_width)).astype(np.float32) for img in imgs]
+            imgs = [transform.resize(img, (args.img_height, args.img_width), mode='constant', anti_aliasing=True).astype(np.float32) for img in imgs]
 
         imgs = [np.transpose(img, (2,0,1)) for img in imgs]
 
@@ -66,7 +66,7 @@ def main():
             else:
                 ref_imgs.append(img)
 
-        _, poses, _ = pose_net(tgt_img, ref_imgs)
+        _, poses= pose_net(tgt_img, ref_imgs)
 
         poses = poses.cpu()[0]
         poses = torch.cat([poses[:len(imgs)//2], torch.zeros(1,6).float(), poses[len(imgs)//2:]])
