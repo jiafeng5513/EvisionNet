@@ -795,6 +795,8 @@ local.properties
 
 # user specified:
 *.tar
+*.gz
+*.tar.gz
 *.npy
 !*.sh
 # SfmLenaer_pytorch
@@ -808,7 +810,8 @@ local.properties
 # depth_from_video_in_the_wild
 
 # struct2depth
-
+/comparisons/struct2depth/pretrained_models/
+/comparisons/struct2depth/pretrained_models/struct2depth_model_kitti/
 # evision_net
 /evision_net/checkpoints/
 

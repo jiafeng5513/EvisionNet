@@ -53,6 +53,14 @@ python inference.py \
     --output_dir $output_dir \
     --model_ckpt $model_checkpoint
 ```
+--logtostderr 
+--file_extension png \
+--depth 
+--egomotion true 
+--input_dir /home/RAID1/DataSet/KITTI/Test/
+--output_dir /home/RAID1/DataSet/KITTI/TestOutput
+--model_ckpt /home/RAID1/Projects/EvisionNet/comparisons/struct2depth/pretrained_models/struct2depth_model_kitti/model-199160
+
 
 Note that the egomotion prediction expects the files in the input directory to be a consecutive sequence, and that sorting the filenames alphabetically is putting them in the right order.
 
