@@ -140,16 +140,13 @@ def depth_prediction_resnet18unet(images, is_training, decoder_weight_reg=0.0,
                  normalizer_params=None,
                  activation_fn=tf.nn.relu,
                  weights_regularizer=reg):
-    upconv5 = layers.conv2d_transpose(
-        bottleneck, decoder_filters[4], [3, 3], stride=2, scope='upconv5')
-    iconv5 = layers.conv2d(
-        _concat_and_pad(upconv5, econv4, padding_mode),
-        decoder_filters[4], [3, 3],
-        stride=1,
-        scope='iconv5',
-        padding='VALID')
-    upconv4 = layers.conv2d_transpose(
-        iconv5, decoder_filters[3], [3, 3], stride=2, scope='upconv4')
+    # tf.contrib.layers.conv2d_transpose(imputs,num_outputs,kernel_size,strid,scope)
+    upconv5 = layers.conv2d_transpose(bottleneck, decoder_filters[4], [3, 3], stride=2, scope='upconv5')
+    # tf.contrib.layers.conv2d(inputs,num_outputs,kernel_size,stride,padding,scope)
+    iconv5 = layers.conv2d( _concat_and_pad(upconv5, econv4, padding_mode),decoder_filters[4], [3, 3],
+                          stride=1,scope='iconv5',padding='VALID')
+
+    upconv4 = layers.conv2d_transpose(iconv5, decoder_filters[3], [3, 3], stride=2, scope='upconv4')
     iconv4 = layers.conv2d(
         _concat_and_pad(upconv4, econv3, padding_mode),
         decoder_filters[3], [3, 3],
