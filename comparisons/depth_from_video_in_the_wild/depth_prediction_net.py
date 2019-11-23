@@ -95,8 +95,7 @@ def encoder_resnet(target_image, weight_reg, is_training, normalizer_fn=None):
   return econv5, (econv4, econv3, econv2, econv1)
 
 
-def depth_prediction_resnet18unet(images, is_training, decoder_weight_reg=0.0,
-                                  normalizer_fn=None, reflect_padding=True):
+def depth_prediction_resnet18unet(images, is_training, decoder_weight_reg=0.0, normalizer_fn=None, reflect_padding=True):
   """A depth prediciton network based on a ResNet18 UNet architecture.
 
   This network is identical to disp_net in struct2depth.nets with
@@ -125,21 +124,16 @@ def depth_prediction_resnet18unet(images, is_training, decoder_weight_reg=0.0,
 
   # The struct2depth resnet encoder does not use the weight_reg argument, hence
   # we're passing None.
-  bottleneck, skip_connections = encoder_resnet(
-      images,
-      weight_reg=None,
-      is_training=is_training,
-      normalizer_fn=normalizer_fn)
+
+  bottleneck, skip_connections = encoder_resnet(images, weight_reg=None, is_training=is_training, normalizer_fn=normalizer_fn)
 
   (econv4, econv3, econv2, econv1) = skip_connections
   decoder_filters = [16, 32, 64, 128, 256]
   reg = layers.l2_regularizer(decoder_weight_reg)
   padding_mode = 'REFLECT' if reflect_padding else 'CONSTANT'
-  with arg_scope([layers.conv2d, layers.conv2d_transpose],
-                 normalizer_fn=None,
-                 normalizer_params=None,
-                 activation_fn=tf.nn.relu,
-                 weights_regularizer=reg):
+
+  with arg_scope([layers.conv2d, layers.conv2d_transpose], normalizer_fn=None, normalizer_params=None,
+                 activation_fn=tf.nn.relu, weights_regularizer=reg):
     # tf.contrib.layers.conv2d_transpose(imputs,num_outputs,kernel_size,strid,scope)
     upconv5 = layers.conv2d_transpose(bottleneck, decoder_filters[4], [3, 3], stride=2, scope='upconv5')
     # tf.contrib.layers.conv2d(inputs,num_outputs,kernel_size,stride,padding,scope)
@@ -147,49 +141,24 @@ def depth_prediction_resnet18unet(images, is_training, decoder_weight_reg=0.0,
                           stride=1,scope='iconv5',padding='VALID')
 
     upconv4 = layers.conv2d_transpose(iconv5, decoder_filters[3], [3, 3], stride=2, scope='upconv4')
-    iconv4 = layers.conv2d(
-        _concat_and_pad(upconv4, econv3, padding_mode),
-        decoder_filters[3], [3, 3],
-        stride=1,
-        scope='iconv4',
-        padding='VALID')
-    upconv3 = layers.conv2d_transpose(
-        iconv4, decoder_filters[2], [3, 3], stride=2, scope='upconv3')
-    iconv3 = layers.conv2d(
-        _concat_and_pad(upconv3, econv2, padding_mode),
-        decoder_filters[2], [3, 3],
-        stride=1,
-        scope='iconv3',
-        padding='VALID')
-    upconv2 = layers.conv2d_transpose(
-        iconv3, decoder_filters[1], [3, 3], stride=2, scope='upconv2')
-    iconv2 = layers.conv2d(
-        _concat_and_pad(upconv2, econv1, padding_mode),
-        decoder_filters[1], [3, 3],
-        stride=1,
-        scope='iconv2',
-        padding='VALID')
-    upconv1 = layers.conv2d_transpose(
-        iconv2, decoder_filters[0], [3, 3], stride=2, scope='upconv1')
-    upconv1 = tf.pad(
-        upconv1, [[0, 0], [1, 1], [1, 1], [0, 0]], mode=padding_mode)
-    iconv1 = layers.conv2d(
-        upconv1,
-        decoder_filters[0], [3, 3],
-        stride=1,
-        scope='iconv1',
-        padding='VALID')
-    depth_input = tf.pad(
-        iconv1, [[0, 0], [1, 1], [1, 1], [0, 0]], mode=padding_mode)
+    iconv4 = layers.conv2d( _concat_and_pad(upconv4, econv3, padding_mode),decoder_filters[3], [3, 3],
+                           stride=1, scope='iconv4', padding='VALID')
 
-    return layers.conv2d(
-        depth_input,
-        1, [3, 3],
-        stride=1,
-        activation_fn=tf.nn.softplus,
-        normalizer_fn=None,
-        scope='disp1',
-        padding='VALID')
+    upconv3 = layers.conv2d_transpose(iconv4, decoder_filters[2], [3, 3], stride=2, scope='upconv3')
+    iconv3 = layers.conv2d(_concat_and_pad(upconv3, econv2, padding_mode), decoder_filters[2], [3, 3],
+                          stride=1, scope='iconv3', padding='VALID')
+
+    upconv2 = layers.conv2d_transpose(iconv3, decoder_filters[1], [3, 3], stride=2, scope='upconv2')
+    iconv2 = layers.conv2d(_concat_and_pad(upconv2, econv1, padding_mode), decoder_filters[1], [3, 3],
+                          stride=1, scope='iconv2', padding='VALID')
+
+    upconv1 = layers.conv2d_transpose(iconv2, decoder_filters[0], [3, 3], stride=2, scope='upconv1')
+    upconv1 = tf.pad(upconv1, [[0, 0], [1, 1], [1, 1], [0, 0]], mode=padding_mode)
+    iconv1 = layers.conv2d(upconv1, decoder_filters[0], [3, 3],stride=1, scope='iconv1', padding='VALID')
+    depth_input = tf.pad( iconv1, [[0, 0], [1, 1], [1, 1], [0, 0]], mode=padding_mode)
+
+    return layers.conv2d(depth_input, 1, [3, 3], stride=1, activation_fn=tf.nn.softplus, normalizer_fn=None,
+                         scope='disp1', padding='VALID')
 
 
 def _concat_and_pad(decoder_layer, encoder_layer, padding_mode):
