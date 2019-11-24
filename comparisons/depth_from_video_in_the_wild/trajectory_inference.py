@@ -28,8 +28,7 @@ from absl import flags
 from absl import logging
 import numpy as np
 import tensorflow as tf
-
-from depth_from_video_in_the_wild import model
+import model
 import cv2
 
 

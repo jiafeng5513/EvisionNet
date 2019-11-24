@@ -21,7 +21,7 @@ from __future__ import print_function
 
 import tensorflow as tf  # tf
 
-from depth_from_video_in_the_wild import transform_utils
+import transform_utils
 
 
 def rgbd_consistency_loss(frame1transformed_depth, frame1rgb, frame2depth,

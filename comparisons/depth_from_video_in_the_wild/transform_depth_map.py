@@ -21,7 +21,7 @@ from __future__ import print_function
 
 import tensorflow as tf
 
-from depth_from_video_in_the_wild import transform_utils
+import transform_utils
 
 
 class TransformedDepthMap(object):
