@@ -805,10 +805,10 @@ local.properties
 /comparisons/SfmLeaner_TF/checkpoints/
 /comparisons/SfmLeaner_TF/test_output/
 /comparisons/SfmLeaner_TF/Core/kitti_eval/pose_data/
-/comparisons/SfmLeaner_TF/models/depth_model
-/comparisons/SfmLeaner_TF/models/pose_model
+/comparisons/SfmLeaner_TF/models/depth_model/
+/comparisons/SfmLeaner_TF/models/pose_model/
 # depth_from_video_in_the_wild
-
+/comparisons/depth_from_video_in_the_wild/checkpoints/
 # struct2depth
 /comparisons/struct2depth/pretrained_models/
 /comparisons/struct2depth/pretrained_models/struct2depth_model_kitti/

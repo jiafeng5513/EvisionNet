@@ -20,6 +20,11 @@ python -m depth_from_video_in_the_wild.train \
    --checkpoint_dir=$MY_CHECKPOINT_DIR \
    --data_dir=$MY_DATA_DIR \
    --imagenet_ckpt=$MY_IMAGENET_CHECKPOINT
+
+   --checkpoint_dir=/home/RAID1/Projects/EvisionNet/comparisons/depth_from_video_in_the_wild/checkpoints \
+   --data_dir=/home/RAID1/DataSet/KITTI/DataForStruct2depth/KITTI_processed/ \
+   --imagenet_ckpt=$MY_IMAGENET_CHECKPOINT
+
 ```
 
 `MY_CHECKPOINT_DIR` is where the trained model checkpoints are to be saved.
