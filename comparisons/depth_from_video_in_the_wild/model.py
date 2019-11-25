@@ -36,8 +36,7 @@ import transform_utils
 gfile = tf.gfile
 slim = tf.contrib.slim
 # Number of subsequent frames per training sample. It is set to 3 for mainly
-# legacy reasons: The training loss itself only involves two adjacent images at
-# a time.
+# legacy reasons: The training loss itself only involves two adjacent images at a time.
 SEQ_LENGTH = 3
 LAYER_NORM_NOISE_RAMPUP_STEPS = 10000
 MIN_OBJECT_AREA = 20
@@ -345,8 +344,7 @@ class Model(object):
     def _build_train_op(self):
         with tf.name_scope('train_op'):
             optim = tf.train.AdamOptimizer(self.learning_rate, self.beta1)
-            self.train_op = slim.learning.create_train_op(self.total_loss, optim,
-                                                          clip_gradient_norm=10.0)
+            self.train_op = slim.learning.create_train_op(self.total_loss, optim, clip_gradient_norm=10.0)
 
     def _build_summaries(self):
         """Adds scalar and image summaries for TensorBoard."""

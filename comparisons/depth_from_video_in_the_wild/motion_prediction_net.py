@@ -51,17 +51,11 @@ def add_intrinsics_head(bottleneck, image_height, image_width):
         # are typically a fraction the image width and height in pixels. We thus
         # multiply the network prediction by the width and height, and the
         # additional 0.5 them by default at the center of the image.
+
+        # tf.squeeze(x,axis):Removes a 1-dimension from the tensor at index "axis".
         offsets = (tf.squeeze(
-            layers.conv2d(
-                bottleneck,
-                2, [1, 1],
-                stride=1,
-                activation_fn=None,
-                weights_regularizer=None,
-                biases_initializer=None,
-                scope='offsets'),
-            axis=(1, 2)) + 0.5) * tf.to_float(
-            tf.convert_to_tensor([[image_width, image_height]]))
+            layers.conv2d( bottleneck, 2, [1, 1], stride=1, activation_fn=None, weights_regularizer=None, biases_initializer=None, scope='offsets'),
+            axis=(1, 2)) + 0.5) * tf.to_float(tf.convert_to_tensor([[image_width, image_height]]))
 
         foci = tf.linalg.diag(focal_lengths)
 
