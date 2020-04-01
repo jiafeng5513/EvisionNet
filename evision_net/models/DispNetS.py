@@ -41,12 +41,12 @@ def crop_like(input, ref):
 
 class DispNetS(nn.Module):
 
-    def __init__(self, alpha=10, beta=0.01):
+    def __init__(self, training=False, alpha=10, beta=0.01):
         super(DispNetS, self).__init__()
 
         self.alpha = alpha
         self.beta = beta
-
+        self.training = training
         conv_planes = [32, 64, 128, 256, 512, 512, 512]
         self.conv1 = downsample_conv(3,              conv_planes[0], kernel_size=7)
         self.conv2 = downsample_conv(conv_planes[0], conv_planes[1], kernel_size=5)
@@ -133,3 +133,23 @@ class DispNetS(nn.Module):
             return disp1, disp2, disp3, disp4
         else:
             return disp1
+
+
+if __name__ == "__main__":
+    model = DispNetS(training=False)
+    model = model.cuda()
+    model.eval()
+    #image = torch.randn(1, 3, 385, 513)  # 输入尺寸
+
+    image = torch.randn(1, 3, 128, 416)  # 输入尺寸
+    image = image.cuda()
+    with torch.no_grad():
+        out0 = model(image)
+    out1=out0.cpu().numpy()[0,0]
+    import numpy as np
+    predictions = np.zeros((365, *out1.shape))
+    out2 = out0[0]
+    print('out0 size:', out0.size())
+    print('out0[0] size:', out2.size())
+    print('out1 size:', out1.shape)
+    print('predictions size:', predictions.shape)

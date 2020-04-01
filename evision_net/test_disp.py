@@ -1,12 +1,11 @@
 import torch
-
 from scipy.misc import imresize
 from scipy.ndimage.interpolation import zoom
 import numpy as np
 from path import Path
 import argparse
 from tqdm import tqdm
-
+from PIL import Image
 from models import DispNetS, PoseExpNet
 
 
@@ -81,7 +80,9 @@ def main():
         if (not args.no_resize) and (h != args.img_height or w != args.img_width):
             tgt_img = imresize(tgt_img, (args.img_height, args.img_width)).astype(np.float32)
             ref_imgs = [imresize(img, (args.img_height, args.img_width)).astype(np.float32) for img in ref_imgs]
-
+            # see : https://blog.csdn.net/discoverer100/article/details/95534621
+            # tgt_img = np.array(Image.fromarray(tgt_img).resize((args.img_height, args.img_width))).astype(np.float32)
+            # ref_imgs =[np.array(Image.fromarray(img).resize((args.img_height, args.img_width))) for img in ref_imgs]
         tgt_img = np.transpose(tgt_img, (2, 0, 1))
         ref_imgs = [np.transpose(img, (2,0,1)) for img in ref_imgs]
 

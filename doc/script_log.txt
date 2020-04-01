@@ -10,7 +10,11 @@ python3 train.py /home/RAID1/DataSet/KITTI/KittiRaw_formatted/ -b4 -m0.2 -s0.1 -
 /home/RAID1/DataSet/KITTI/Test/
 
 python3 run_inference.py --pretrained /home/RAID1/Projects/EvisionNet/Pytorch_version/checkpoints/KittiRaw_formatted/07-14-18:10/dispnet_model_best.pth.tar --dataset-dir /home/RAID1/DataSet/KITTI/Test/ --output-dir /home/RAID1/DataSet/KITTI/Test/output/ --output-depth
-
+python3 run_inference.py
+    --pretrained E:/Dissertation/EvisionNet/comparisons/SfmLeaner_pytorch/ckpt/dispnet_model_best.pth.tar
+    --dataset-dir H:/data/KITTI/TestDepth-Odometry-09/
+    --output-dir H:/data/KITTI/TestDepth-Odometry-09/depth/
+    --output-depth
 
 python3 test_disp.py
 --pretrained-dispnet /home/RAID1/Projects/EvisionNet/comparisons/SfmLeaner_pytorch/checkpoints/KittiRaw_formatted/11-14-1041/dispnet_model_best.pth.tar
@@ -33,3 +37,13 @@ python3 test_pose.py /home/RAID1/Projects/EvisionNet/Pytorch_version/checkpoints
 
 
 python3 test_pose.py /home/RAID1/Projects/EvisionNet/Pytorch_version/checkpoints/KittiRaw_formatted,m0.6/07-29-0949/exp_pose_model_best.pth.tar --dataset-dir /home/RAID1/DataSet/KITTI/KittiOdometry/ --sequences 09
+
+
+comparisons/struct2depth/inference.py
+        --logtostderr
+        --file_extension png
+        --depth
+        --egomotion true
+        --input_dir H:/data/KITTI/TestDepth-Odometry-09
+        --output_dir H:/data/KITTI/TestDepth-Odometry-09/TestOutput
+        --model_ckpt E:/Dissertation/EvisionNet/comparisons/struct2depth/ckpt/Saved/struct2depth_model_kitti/model-199160

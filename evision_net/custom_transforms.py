@@ -3,7 +3,7 @@ import torch
 import random
 import numpy as np
 from scipy.misc import imresize
-
+from PIL import Image
 '''Set of tranform random routines that takes list of inputs as arguments,
 in order to have random but coherent transformations.'''
 
@@ -72,7 +72,13 @@ class RandomScaleCrop(object):
 
         output_intrinsics[0] *= x_scaling
         output_intrinsics[1] *= y_scaling
+
         scaled_images = [imresize(im, (scaled_h, scaled_w)) for im in images]
+        # error:
+        # from scipy.misc import imresize
+        # ImportError: cannot import name 'imresize'
+        # see: https://blog.csdn.net/discoverer100/article/details/95534621
+        #scaled_images = [np.array(Image.fromarray(im).resize((scaled_h, scaled_w), resample=Image.BICUBIC)) for im in images]
 
         offset_y = np.random.randint(scaled_h - in_h + 1)
         offset_x = np.random.randint(scaled_w - in_w + 1)

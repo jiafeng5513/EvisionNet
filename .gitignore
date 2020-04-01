@@ -801,6 +801,8 @@ local.properties
 !*.sh
 # SfmLenaer_pytorch
 /comparisons/SfmLeaner_pytorch/checkpoints/
+/comparisons/SfmLeaner_pytorch/ckpt/
+/comparisons/SfmLeaner_pytorch/log/
 # SfmLeaner_TF
 /comparisons/SfmLeaner_TF/checkpoints/
 /comparisons/SfmLeaner_TF/test_output/
@@ -809,7 +811,10 @@ local.properties
 /comparisons/SfmLeaner_TF/models/pose_model/
 # depth_from_video_in_the_wild
 /comparisons/depth_from_video_in_the_wild/checkpoints/
+/comparisons/depth_from_video_in_the_wild/ckpt/
+/comparisons/DfvNet/ckpt/
 # struct2depth
+/comparisons/struct2depth/ckpt/
 /comparisons/struct2depth/pretrained_models/
 /comparisons/struct2depth/pretrained_models/struct2depth_model_kitti/
 # evision_net

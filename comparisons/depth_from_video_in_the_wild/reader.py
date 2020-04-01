@@ -295,7 +295,7 @@ class DataReader(object):
   def compile_file_list(self, data_dir, split, load_pose=False):
     """Creates a list of input files."""
     logging.info('data_dir: %s', data_dir)
-    with gfile.Open(os.path.join(data_dir, '%s.txt' % split), 'r') as f:
+    with tf.io.gfile.GFile(os.path.join(data_dir, '%s.txt' % split), 'r') as f:
       frames = f.readlines()
       frames = [k.rstrip() for k in frames]
     subfolders = [x.split(' ')[0] for x in frames]

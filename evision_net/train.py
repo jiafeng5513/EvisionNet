@@ -13,11 +13,12 @@ from my_utils import tensor2array, save_checkpoint, save_path_formatter, log_out
 from loss_functions import photometric_reconstruction_loss, explainability_loss, smooth_loss, compute_errors
 from tensorboardX import SummaryWriter
 from tqdm import tqdm
-
+from ConstTable import *
+#initConstTable()
 parser = argparse.ArgumentParser(description='EvisionNet', formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 
 """Program Initialization parameters"""
-parser.add_argument('data', metavar='/home/RAID1/DataSet/KITTI/KittiRaw_formatted/', help='预处理后的数据集路径')
+parser.add_argument('data', metavar='path to KittiRaw_formatted', help='预处理后的数据集路径')
 parser.add_argument('--dataset-format', default='sequential', metavar='STR', help='数据格式, stacked:连帧;sequential:单帧序列')
 parser.add_argument('-j', '--workers', default=4, type=int, metavar='N', help='数据加载线程数')
 parser.add_argument('--pretrained-disp', dest='pretrained_disp', default=None, metavar='PATH', help='预训练Disp-Net的路径')

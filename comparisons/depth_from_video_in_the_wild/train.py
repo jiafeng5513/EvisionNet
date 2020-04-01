@@ -82,11 +82,11 @@ def _print_losses(dir1):
 def main(_):
     # Fixed seed for repeatability
     seed = FLAGS.seed
-    tf.set_random_seed(seed)
+    tf.compat.v1.set_random_seed(seed)
     np.random.seed(seed)
     random.seed(seed)
 
-    if not gfile.Exists(FLAGS.checkpoint_dir):
+    if not tf.io.gfile.exists(FLAGS.checkpoint_dir):
         gfile.MakeDirs(FLAGS.checkpoint_dir)
 
     train_model = model.Model(

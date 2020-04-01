@@ -1,7 +1,7 @@
 torch >= 1.0.1
 imageio
 matplotlib
-scipy
+scipy == 1.2.0
 argparse
 tensorboardX
 blessings

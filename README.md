@@ -8,6 +8,7 @@ EvisonNet
 * `comparisons`:对比实验
 * `evision_net`:本文提出的模型
 * `utils`:一些工具
+* `pose_eval`: 用于评价ego-motion
 ### 2. 环境说明<br>
 * Windows10 or Ubuntu 18.04
 * Python3.6 or 3.7,Anaconda3
@@ -51,24 +52,24 @@ EvisonNet
 [15]. [视觉里程计 第二部分：匹配、鲁棒、优化和应用](https://blog.csdn.net/cicibabe/article/details/70260936).<br>
 [16]. [怎样通过照片获得高质量3D模型](https://zhuanlan.zhihu.com/p/24137374).<br>
 [17]. [tqdm.postfix](https://zhen8838.github.io/2019/01/25/tqdm-fmt/).<br>
-
+[18]. [KITTI_odometry_evaluation_tool](https://github.com/LearnerLee/KITTI_odometry_evaluation_tool)
 ### 6.性能记录
 #### 表1:性能指标
 * seq 09和seq 10是ego-motion的指标(smaller the better).<br>
 * 其余是单目深度的指标(for Abs Rel,Sq Rel,rms,log_rms,smaller the better;for A1,A2,A3,bigger the better).<br>
 * 全部为只使用KITTI数据集的实验结果.<br>
 
-|ego-motion ATE in seq 09|ego-motion ATE in seq 10|abs_diff|Abs Rel|Sq Rel|rms  |log_rms|abs_log|A1    |A2    |A3    |备注 |
-|:----------------------:|:----------------------:|:------:|:-----:|:----:|:---:|:-----:|:-----:|:----:|:----:|:----:|:---:|
-|mean:0.0160, std: 0.0090|mean:0.0130, std: 0.0090|------  |0.183  |1.595 |6.700 |0.270  |------ |0.734 |0.902 |0.959 | SfmLeaner Github<sup>1</sup> |
-|mean:0.0210, std: 0.0170|mean:0.0200, std: 0.0150|------  |0.208  |1.768 |6.856 |0.283  |------ |0.678 |0.885 |0.957 | SfmLeaner Paper<sup>2</sup> |
-|mean:0.0179, std: 0.0110|mean:0.0141, std: 0.0115|------  |0.181  |1.341 |6.236 |0.262  |------ |0.733 |0.901 |0.964 | SfmLeaner third party Github<sup>3</sup> |
-|mean:0.0107, std: 0.0062|mean:0.0096, std: 0.0072|3.8481  |0.2260 |2.310 |6.827 |0.301  |0.2136 |0.677 |0.878 |0.947 | Ours SfmLeaner-Pytorch<sup>4</sup> |
-|mean:0.0312, std: 0.0217|mean:0.0237, std: 0.0208|3.9069  |0.2330 |2.4643|6.830 |0.314  |0.2219 |0.6704|0.869 |0.940 | intri_pred<sup>5</sup>|
-|mean:------, std: ------|mean:------, std: ------|------  |0.1417 |1.1385|5.5205|0.2186 |------ |0.8203|0.9415|0.9762| struct2depth baseline <sup>6</sup>|
-|mean:0.0110, std: 0.0060|mean:0.0110, std: 0.0100|------  |0.1087 |0.8250|4.7503|0.1866 |------ |0.8738|0.9577|0.9825| struct2depth M+R <sup>7</sup>|
-|mean:0.0090, std: ------|mean:0.0080, std: ------|------  |0.129  |0.982 |5.23  |-------|------ |------|------|------| DFV Given intrinsics <sup>8</sup>|
-|mean:0.0120, std: ------|mean:0.0100, std: 0.0100|------  |0.128  |0.959 |5.23  |-------|------ |------|------|------| DFV Learned intrinsics <sup>9</sup>|
+|ATE in seq 09|ATE in seq 10|Abs Rel|Sq Rel|rms  |log_rms|A1    |A2    |A3    |备注 |
+|:----------------------:|:----------------------:|:-----:|:----:|:---:|:-----:|:----:|:----:|:----:|:---:|
+|0.0160 ± 0.0090|0.0130 ± 0.0090|0.183  |1.595 |6.700 |0.270  |0.734 |0.902 |0.959 | SfmLeaner Github<sup>1</sup> |
+|0.0210 ± 0.0170|0.0200 ± 0.0150|0.208  |1.768 |6.856 |0.283  |0.678 |0.885 |0.957 | SfmLeaner Paper<sup>2</sup> |
+|0.0179 ± 0.0110|0.0141 ± 0.0115|0.181  |1.341 |6.236 |0.262  |0.733 |0.901 |0.964 | SfmLeaner third party Github<sup>3</sup> |
+|0.0107 ± 0.0062|0.0096 ± 0.0072|0.2260 |2.310 |6.827 |0.301  |0.677 |0.878 |0.947 | Ours SfmLeaner-Pytorch<sup>4</sup> |
+|0.0312 ± 0.0217|0.0237 ± 0.0208|0.2330 |2.4643|6.830 |0.314  |0.6704|0.869 |0.940 | intri_pred<sup>5</sup>|
+|    ------     |    -------    |0.1417 |1.1385|5.5205|0.2186 |0.8203|0.9415|0.9762| struct2depth baseline <sup>6</sup>|
+|0.0110 ± 0.0060|0.0110 ± 0.0100|0.1087 |0.8250|4.7503|0.1866 |0.8738|0.9577|0.9825| struct2depth M+R <sup>7</sup>|
+|0.0090 ± ------|0.0080 ± ------|0.129  |0.982 |5.23  |-------|------|------|------| DFV Given intrinsics <sup>8</sup>|
+|0.0120 ± ------|0.0100 ± 0.0100|0.128  |0.959 |5.23  |-------|------|------|------| DFV Learned intrinsics <sup>9</sup>|
 #### 附表1:备注
 1. SfMLearner文中(参考文献[5])所附Github的readme给出的最好结果,作者说明更改为:增加了数据扩增,移除了BN,一些微调,只用KITTI数据,没有使用explainability regularization.该效果部分略好于论文上的结果<br>
 2. SfMLearner文中(参考文献[5])给出的KITTI上的最好成绩.<br>
