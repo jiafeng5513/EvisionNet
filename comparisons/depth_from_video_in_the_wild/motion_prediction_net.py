@@ -1,5 +1,5 @@
 # coding=utf-8
-# Copyright 2019 The Google Research Authors.
+# Copyright 2020 The Google Research Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -15,10 +15,8 @@
 
 """A network for predicting egomotion, a 3D translation field and intrinsics."""
 
-import tensorflow as tf
-
-layers = tf.contrib.layers
-arg_scope = tf.contrib.framework.arg_scope
+import tensorflow.compat.v1 as tf
+from tensorflow.contrib import layers
 
 
 def add_intrinsics_head(bottleneck, image_height, image_width):
@@ -43,19 +41,31 @@ def add_intrinsics_head(bottleneck, image_height, image_width):
         # Since the focal lengths in pixels tend to be in the order of magnitude of
         # the image width and height, we multiply the network prediction by them.
         focal_lengths = tf.squeeze(
-            layers.conv2d(bottleneck, 2, [1, 1], stride=1, activation_fn=tf.nn.softplus, weights_regularizer=None,
-                          scope='foci'),
-            axis=(1, 2)) * tf.to_float(tf.convert_to_tensor([[image_width, image_height]]))
+            layers.conv2d(
+                bottleneck,
+                2, [1, 1],
+                stride=1,
+                activation_fn=tf.nn.softplus,
+                weights_regularizer=None,
+                scope='foci'),
+            axis=(1, 2)) * tf.to_float(
+            tf.convert_to_tensor([[image_width, image_height]]))
 
         # The pixel offsets tend to be around the center of the image, and they
         # are typically a fraction the image width and height in pixels. We thus
         # multiply the network prediction by the width and height, and the
         # additional 0.5 them by default at the center of the image.
-
-        # tf.squeeze(x,axis):Removes a 1-dimension from the tensor at index "axis".
         offsets = (tf.squeeze(
-            layers.conv2d( bottleneck, 2, [1, 1], stride=1, activation_fn=None, weights_regularizer=None, biases_initializer=None, scope='offsets'),
-            axis=(1, 2)) + 0.5) * tf.to_float(tf.convert_to_tensor([[image_width, image_height]]))
+            layers.conv2d(
+                bottleneck,
+                2, [1, 1],
+                stride=1,
+                activation_fn=None,
+                weights_regularizer=None,
+                biases_initializer=None,
+                scope='offsets'),
+            axis=(1, 2)) + 0.5) * tf.to_float(
+            tf.convert_to_tensor([[image_width, image_height]]))
 
         foci = tf.linalg.diag(focal_lengths)
 
@@ -85,42 +95,86 @@ def motion_field_net(images, weight_reg=0.0):
   """
 
     with tf.variable_scope('MotionFieldNet'):
-        with arg_scope([layers.conv2d],
-                       weights_regularizer=layers.l2_regularizer(weight_reg),
-                       activation_fn=tf.nn.relu):
-            # tf.contrib.layers.conv2d(inputs,num_outputs,kernel_size,stride,padding,scope)
-            conv1 = layers.conv2d(images, 16, [3, 3], stride=2, scope='Conv1')
-            conv2 = layers.conv2d(conv1, 32, [3, 3], stride=2, scope='Conv2')
-            conv3 = layers.conv2d(conv2, 64, [3, 3], stride=2, scope='Conv3')
-            conv4 = layers.conv2d(conv3, 128, [3, 3], stride=2, scope='Conv4')
-            conv5 = layers.conv2d(conv4, 256, [3, 3], stride=2, scope='Conv5')
-            conv6 = layers.conv2d(conv5, 512, [3, 3], stride=2, scope='Conv6')
-            conv7 = layers.conv2d(conv6, 1024, [3, 3], stride=2, scope='Conv7')
+        conv1 = layers.conv2d(
+            images,
+            16, [3, 3],
+            stride=2,
+            scope='Conv1',
+            weights_regularizer=layers.l2_regularizer(weight_reg),
+            activation_fn=tf.nn.relu)
+        conv2 = layers.conv2d(
+            conv1,
+            32, [3, 3],
+            stride=2,
+            scope='Conv2',
+            weights_regularizer=layers.l2_regularizer(weight_reg),
+            activation_fn=tf.nn.relu)
+        conv3 = layers.conv2d(
+            conv2,
+            64, [3, 3],
+            stride=2,
+            scope='Conv3',
+            weights_regularizer=layers.l2_regularizer(weight_reg),
+            activation_fn=tf.nn.relu)
+        conv4 = layers.conv2d(
+            conv3,
+            128, [3, 3],
+            stride=2,
+            scope='Conv4',
+            weights_regularizer=layers.l2_regularizer(weight_reg),
+            activation_fn=tf.nn.relu)
+        conv5 = layers.conv2d(
+            conv4,
+            256, [3, 3],
+            stride=2,
+            scope='Conv5',
+            weights_regularizer=layers.l2_regularizer(weight_reg),
+            activation_fn=tf.nn.relu)
+        conv6 = layers.conv2d(
+            conv5,
+            512, [3, 3],
+            stride=2,
+            scope='Conv6',
+            weights_regularizer=layers.l2_regularizer(weight_reg),
+            activation_fn=tf.nn.relu)
+        conv7 = layers.conv2d(
+            conv6,
+            1024, [3, 3],
+            stride=2,
+            scope='Conv7',
+            weights_regularizer=layers.l2_regularizer(weight_reg),
+            activation_fn=tf.nn.relu)
 
-            bottleneck = tf.reduce_mean(conv7, axis=[1, 2], keepdims=True)
+        bottleneck = tf.reduce_mean(conv7, axis=[1, 2], keepdims=True)
 
-            background_motion = layers.conv2d(bottleneck, 6, [1, 1], stride=1, activation_fn=None, biases_initializer=None, scope='background_motion')
+        background_motion = layers.conv2d(
+            bottleneck,
+            6, [1, 1],
+            stride=1,
+            activation_fn=None,
+            biases_initializer=None,
+            scope='background_motion')
 
-            rotation = background_motion[:, 0, 0, :3]
-            translation = background_motion[:, :, :, 3:]
-            residual_translation = _refine_motion_field(translation, conv7)
-            residual_translation = _refine_motion_field(residual_translation, conv6)
-            residual_translation = _refine_motion_field(residual_translation, conv5)
-            residual_translation = _refine_motion_field(residual_translation, conv4)
-            residual_translation = _refine_motion_field(residual_translation, conv3)
-            residual_translation = _refine_motion_field(residual_translation, conv2)
-            residual_translation = _refine_motion_field(residual_translation, conv1)
-            residual_translation = _refine_motion_field(residual_translation, images)
+        rotation = background_motion[:, 0, 0, :3]
+        translation = background_motion[:, :, :, 3:]
+        residual_translation = _refine_motion_field(translation, conv7)
+        residual_translation = _refine_motion_field(residual_translation, conv6)
+        residual_translation = _refine_motion_field(residual_translation, conv5)
+        residual_translation = _refine_motion_field(residual_translation, conv4)
+        residual_translation = _refine_motion_field(residual_translation, conv3)
+        residual_translation = _refine_motion_field(residual_translation, conv2)
+        residual_translation = _refine_motion_field(residual_translation, conv1)
+        residual_translation = _refine_motion_field(residual_translation, images)
 
-            rot_scale, trans_scale = create_scales(0.001)
-            translation *= trans_scale
-            residual_translation *= trans_scale
-            rotation *= rot_scale
+        rot_scale, trans_scale = create_scales(0.001)
+        translation *= trans_scale
+        residual_translation *= trans_scale
+        rotation *= rot_scale
 
-            image_height, image_width = tf.unstack(tf.shape(images)[1:3])
-            intrinsic_mat = add_intrinsics_head(bottleneck, image_height, image_width)
+        image_height, image_width = tf.unstack(tf.shape(images)[1:3])
+        intrinsic_mat = add_intrinsics_head(bottleneck, image_height, image_width)
 
-            return (rotation, translation, residual_translation, intrinsic_mat)
+        return (rotation, translation, residual_translation, intrinsic_mat)
 
 
 def create_scales(constraint_minimum):
@@ -179,14 +233,18 @@ def _refine_motion_field(motion_field, layer):
     _, h, w, _ = tf.unstack(tf.shape(layer))
     upsampled_motion_field = tf.image.resize_bilinear(motion_field, [h, w])
     conv_input = tf.concat([upsampled_motion_field, layer], axis=3)
-    conv_output = layers.conv2d(conv_input, max(4, layer.shape.as_list()[-1]), [3, 3], stride=1)
-    conv_input = layers.conv2d(conv_input, max(4, layer.shape.as_list()[-1]), [3, 3], stride=1)
-    conv_output2 = layers.conv2d(conv_input, max(4, layer.shape.as_list()[-1]), [3, 3], stride=1)
+    conv_output = layers.conv2d(
+        conv_input, max(4, layer.shape.as_list()[-1]), [3, 3], stride=1)
+    conv_input = layers.conv2d(
+        conv_input, max(4, layer.shape.as_list()[-1]), [3, 3], stride=1)
+    conv_output2 = layers.conv2d(
+        conv_input, max(4, layer.shape.as_list()[-1]), [3, 3], stride=1)
     conv_output = tf.concat([conv_output, conv_output2], axis=-1)
 
-    return upsampled_motion_field + layers.conv2d(conv_output,
-                                                  motion_field.shape.as_list()[-1], [1, 1],
-                                                  stride=1,
-                                                  activation_fn=None,
-                                                  biases_initializer=None,
-                                                  scope=layer.op.name + '/MotionBottleneck')
+    return upsampled_motion_field + layers.conv2d(
+        conv_output,
+        motion_field.shape.as_list()[-1], [1, 1],
+        stride=1,
+        activation_fn=None,
+        biases_initializer=None,
+        scope=layer.op.name + '/MotionBottleneck')

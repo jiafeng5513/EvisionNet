@@ -13,7 +13,9 @@ import os
 import cv2
 from matplotlib.colors import ListedColormap, LinearSegmentedColormap
 from matplotlib import cm
+import matplotlib.pyplot as plt
 
+CMAP_DEFAULT = 'plasma'
 
 def read_calib_file(path):
     # taken from https://github.com/hunse/kitti
@@ -93,18 +95,6 @@ def generate_depth_map(calib_dir, velo_file_name, im_shape, cam=2):
     return depth
 
 
-def opencv_rainbow(resolution=1000):
-    # Construct the opencv equivalent of Rainbow    BGR
-    opencv_rainbow_data = (
-        (0.000, (1.00, 0.00, 0.00)),
-        (0.400, (1.00, 1.00, 0.00)),
-        (0.600, (0.00, 1.00, 0.00)),
-        (0.800, (0.00, 0.00, 1.00)),
-        (1.000, (0.60, 0.00, 1.00))
-    )
-    return LinearSegmentedColormap.from_list('opencv_rainbow', opencv_rainbow_data, resolution)
-
-
 def high_res_colormap(low_res_cmap, resolution=1000, max_value=1):
     # Construct the list colormap, with interpolated values for higer resolution
     # For a linear segmented colormap, you can just specify the number of point in
@@ -116,37 +106,30 @@ def high_res_colormap(low_res_cmap, resolution=1000, max_value=1):
     return ListedColormap(high_res)
 
 
-COLORMAPS = {'rainbow': opencv_rainbow(),
-             'magma': high_res_colormap(cm.get_cmap('magma')),
-             'bone': cm.get_cmap('bone', 10000)}
+def gray2rgb(im, cmap=CMAP_DEFAULT):
+    cmap = plt.get_cmap(cmap)
+    result_img = cmap(im.astype(np.float32))
+    if result_img.shape[2] > 3:
+        result_img = np.delete(result_img, 3, 2)
+    return result_img
 
 
-def tensor2array(tensor, max_value=None, colormap='rainbow'):
-    tensor = tensor.detach().cpu()
-    if max_value is None:
-        max_value = tensor.max().item()
-    if tensor.ndimension() == 2 or tensor.size(0) == 1:
-        norm_array = tensor.squeeze().numpy() / max_value
-        array = COLORMAPS[colormap](norm_array).astype(np.float32)
-        array = array.transpose(2, 0, 1)
-
-    elif tensor.ndimension() == 3:
-        assert (tensor.size(0) == 3)
-        array = 0.5 + tensor.numpy() * 0.5
-    return array
-
-
-def demo():
-    map = [[0.0, 0.0, 0.0, 0.0],
-           [0.5, 0.5, 0.5, 0.5],
-           [0.7, 0.7, 0.7, 0.7],
-           [0.9, 0.9, 0.9, 0.9]]
-    array = COLORMAPS['rainbow'](map).astype(np.float32)
-    pass
+def normalize_depth_for_display(depth, pc=95, crop_percent=0, normalizer=None, cmap=CMAP_DEFAULT):
+    """Converts a depth map to an RGB image."""
+    # Convert to disparity.
+    disp = 1.0 / (depth + 1e-6)
+    if normalizer is not None:
+        disp /= normalizer
+    else:
+        disp /= (np.percentile(disp, pc) + 1e-6)
+    disp = np.clip(disp, 0, 1)
+    disp = gray2rgb(disp, cmap=cmap)
+    keep_h = int(disp.shape[0] * (1 - crop_percent))
+    disp = disp[:keep_h]
+    return disp
 
 
 if __name__ == '__main__':
-    demo()
     # 1. 从kitti_raw挑选要用的测试图片,将对应的png和bin复制到一个文件夹下,注意不要混用不同序列
     test_input_dir = 'H:/data/KITTI/TestDepth-RAW-09-26'
     # 2. 测试图片所在序列的标定文件所在目录
@@ -167,42 +150,7 @@ if __name__ == '__main__':
         array = output
         max_value = np.max(array)
         array = array / max_value
-        # 插值
-        from scipy.interpolate import Rbf
-
-        x = []
-        y = []
-        z = []
-        XI = np.arange(array.shape[1])
-        YI = np.arange(array.shape[0])
-
-        XX,YY = np.meshgrid(XI,YI)
-
-        for i in XI:  # 1242
-            for j in YI:  # 375
-                if array[j][i] != 0:
-                    x.append(i)
-                    y.append(j)
-                    z.append(array[j][i])
-        rbf = Rbf(x, y, z, epsilon=2)  # 这是坐标点和像素值
-        ZZ = rbf(XX, YY)  # 参数是插值范围
-
-        # plot the result
-        import matplotlib.pyplot as plt
-
-        plt.subplot(1, 1, 1)
-        plt.pcolor(XX, YY, ZZ, cmap=cm.jet)
-        plt.scatter(x, y, 100, z, cmap=cm.jet)
-        plt.title('RBF interpolation - multiquadrics')
-        plt.xlim(0, 1241)
-        plt.ylim(0, 374)
-        plt.colorbar()
-
-        array = COLORMAPS['rainbow'](array).astype(np.float32)
-        array = array.transpose(0, 1, 2)
-        array = (255 * array).astype(np.uint8)
-        array = np.transpose(array, (0, 1, 2))
-
+        array = normalize_depth_for_display(array)
         img = array
         # imwrite(str(os.path.splitext(bin_file)[0])+'_gt.png', img)
 

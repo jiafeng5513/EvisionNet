@@ -1,5 +1,5 @@
 # coding=utf-8
-# Copyright 2019 The Google Research Authors.
+# Copyright 2020 The Google Research Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -24,7 +24,7 @@ from __future__ import print_function
 
 from absl import logging
 
-import tensorflow as tf
+import tensorflow.compat.v1 as tf
 import consistency_losses
 import depth_prediction_net
 import motion_prediction_net
@@ -32,11 +32,12 @@ import randomized_layer_normalization
 import reader
 import transform_depth_map
 import transform_utils
+from tensorflow.contrib import slim as contrib_slim
 
 gfile = tf.gfile
-slim = tf.contrib.slim
-# Number of subsequent frames per training sample. It is set to 3 for mainly
-# legacy reasons: The training loss itself only involves two adjacent images at a time.
+slim = contrib_slim
+# 每个训练样本的帧数,一般设置为3
+# 遗留原因：训练损失本身一次仅涉及两个相邻的图像。
 SEQ_LENGTH = 3
 LAYER_NORM_NOISE_RAMPUP_STEPS = 10000
 MIN_OBJECT_AREA = 20
@@ -344,7 +345,8 @@ class Model(object):
     def _build_train_op(self):
         with tf.name_scope('train_op'):
             optim = tf.train.AdamOptimizer(self.learning_rate, self.beta1)
-            self.train_op = slim.learning.create_train_op(self.total_loss, optim, clip_gradient_norm=10.0)
+            self.train_op = slim.learning.create_train_op(self.total_loss, optim,
+                                                          clip_gradient_norm=10.0)
 
     def _build_summaries(self):
         """Adds scalar and image summaries for TensorBoard."""

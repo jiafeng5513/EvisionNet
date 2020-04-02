@@ -1,5 +1,5 @@
 # coding=utf-8
-# Copyright 2019 The Google Research Authors.
+# Copyright 2020 The Google Research Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -28,7 +28,7 @@ from __future__ import print_function
 import os
 import random
 from absl import logging
-import tensorflow as tf
+import tensorflow.compat.v1 as tf
 
 gfile = tf.gfile
 
@@ -295,7 +295,7 @@ class DataReader(object):
   def compile_file_list(self, data_dir, split, load_pose=False):
     """Creates a list of input files."""
     logging.info('data_dir: %s', data_dir)
-    with tf.io.gfile.GFile(os.path.join(data_dir, '%s.txt' % split), 'r') as f:
+    with gfile.Open(os.path.join(data_dir, '%s.txt' % split), 'r') as f:
       frames = f.readlines()
       frames = [k.rstrip() for k in frames]
     subfolders = [x.split(' ')[0] for x in frames]

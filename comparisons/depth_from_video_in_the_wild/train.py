@@ -1,5 +1,5 @@
 # coding=utf-8
-# Copyright 2019 The Google Research Authors.
+# Copyright 2020 The Google Research Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -28,8 +28,9 @@ from absl import app
 from absl import flags
 from absl import logging
 import numpy as np
-import tensorflow as tf
+import tensorflow.compat.v1 as tf
 
+# from depth_from_video_in_the_wild import model
 import model
 
 gfile = tf.gfile
@@ -47,7 +48,8 @@ flags.DEFINE_integer('img_height', 128, 'Input frame height.')
 flags.DEFINE_integer('img_width', 416, 'Input frame width.')
 flags.DEFINE_integer('queue_size', 2000, 'Items in queue. Use smaller number for local debugging.')
 flags.DEFINE_integer('seed', 8964, 'Seed for random number generators.')
-flags.DEFINE_float('weight_reg', 1e-2, 'The amount of weight regularization to apply. This has no effect on the ResNet-based encoder architecture.')
+flags.DEFINE_float('weight_reg', 1e-2, 'The amount of weight regularization to apply. '
+                                       'This has no effect on the ResNet-based encoder architecture.')
 flags.DEFINE_string('checkpoint_dir', None, 'Directory to save model checkpoints.')
 flags.DEFINE_integer('train_steps', int(1e6), 'Number of training steps.')
 flags.DEFINE_integer('summary_freq', 100, 'Save summaries every N steps.')
@@ -82,11 +84,11 @@ def _print_losses(dir1):
 def main(_):
     # Fixed seed for repeatability
     seed = FLAGS.seed
-    tf.compat.v1.set_random_seed(seed)
+    tf.set_random_seed(seed)
     np.random.seed(seed)
     random.seed(seed)
 
-    if not tf.io.gfile.exists(FLAGS.checkpoint_dir):
+    if not gfile.Exists(FLAGS.checkpoint_dir):
         gfile.MakeDirs(FLAGS.checkpoint_dir)
 
     train_model = model.Model(
@@ -110,7 +112,8 @@ def main(_):
         queue_size=FLAGS.queue_size,
         input_file=FLAGS.input_file)
 
-    _train(train_model, FLAGS.checkpoint_dir, FLAGS.train_steps, FLAGS.summary_freq)
+    _train(train_model, FLAGS.checkpoint_dir, FLAGS.train_steps,
+           FLAGS.summary_freq)
 
     if FLAGS.debug:
         _print_losses(os.path.join(FLAGS.checkpoint_dir, 'debug'))
