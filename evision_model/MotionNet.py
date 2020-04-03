@@ -66,7 +66,7 @@ class MotionNet(nn.Module):
         self.conv8 = nn.Conv2d(in_channels=1024, out_channels=6, kernel_size=1, stride=1)  # TODO:in_channels is wrong!
         # 8个 refine
         refine_channels = []
-        self.refine1 = RefineModule(motion_field_channel=6, layer_channel=2)  # translation, conv7
+        self.refine1 = RefineModule(motion_field_channel=3, layer_channel=1024)  # translation, conv7
         self.refine2 = RefineModule(motion_field_channel=1, layer_channel=2)  # refine1_out, conv6
         self.refine3 = RefineModule(motion_field_channel=1, layer_channel=2)  # refine2_out, conv5
         self.refine4 = RefineModule(motion_field_channel=1, layer_channel=2)  # refine3_out, conv4
@@ -87,8 +87,8 @@ class MotionNet(nn.Module):
         # TODO:tf.reduce_mean(conv7, axis=[1, 2], keepdims=True)
         bottleneck = torch.mean(conv_out_7, dim=[1, 2], keepdim=True)
         background_motion = self.conv8(bottleneck)
-        rotation = background_motion[:, 0, 0, :3]
-        translation = background_motion[:, :, :, 3:]
+        rotation = background_motion[:, :3, 0, 0]   # [B, 3]
+        translation = background_motion[:, 3:, :, :]  # [B,3, h, w],
 
 
 
