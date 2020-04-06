@@ -4,6 +4,8 @@ from tensorflow.contrib import layers
 import numpy as np
 from tensorflow.contrib import framework as contrib_framework
 from tensorflow.contrib import layers as contrib_layers
+import random
+
 
 def pytorch_demo():
     image = torch.randn(1, 4, 128, 416)  # 输入尺寸
@@ -129,8 +131,8 @@ def tensorflow_demo2():
 
 
 def tensorflow_demo3():
-    motion_field = tf.placeholder(tf.float32, shape=[1, 2, 7, 3])
-    layer = tf.placeholder(tf.float32, shape=[1, 4, 13, 256])
+    motion_field = tf.placeholder(tf.float32, shape=[4, 1, 1, 3])
+    layer = tf.placeholder(tf.float32, shape=[4, 1, 4, 1024])
 
     _, h, w, _ = tf.unstack(tf.shape(layer))
     upsampled_motion_field = tf.image.resize_bilinear(motion_field, [h, w])
@@ -142,14 +144,16 @@ def tensorflow_demo3():
 
     conv_output4 = layers.conv2d(conv_output3, motion_field.shape.as_list()[-1], [1, 1], stride=1,
                                  activation_fn=None, biases_initializer=None, scope=layer.op.name + '/MotionBottleneck')
-    y = conv_output4 + upsampled_motion_field
+    out = conv_output4 + upsampled_motion_field
+
+    y = conv_output
 
     initialize_op = tf.global_variables_initializer()
     sess = tf.Session()
     sess.run(initialize_op)
 
-    motion_vars = np.random.rand(1, 2, 7, 3)
-    layer_vars = np.random.rand(1, 4, 13, 256)
+    motion_vars = np.random.rand(4, 1, 1, 3)
+    layer_vars = np.random.rand(4, 1, 4, 1024)
 
     sess.run(y, feed_dict={motion_field: motion_vars, layer: layer_vars})
     print(y.shape)
@@ -323,9 +327,11 @@ def s_residual_block_first(x,
         x = s_relu(x, name='relu_2')
     return x
 
+
 def _concat_and_pad(decoder_layer, encoder_layer, padding_mode):
     concat = tf.concat([decoder_layer, encoder_layer], axis=3)
     return tf.pad(concat, [[0, 0], [1, 1], [1, 1], [0, 0]], mode=padding_mode)
+
 
 def depthnet_demo():
     target_image = tf.placeholder(tf.float32, shape=[1, 128, 416, 3])
@@ -338,35 +344,46 @@ def depthnet_demo():
     decoder_filters = [16, 32, 64, 128, 256]
     bottleneck = econv5
     reg = layers.l2_regularizer(0.1)
-    padding_mode = 'CONSTANT'#'REFLECT'
+    padding_mode = 'CONSTANT'  # 'REFLECT'
     with contrib_framework.arg_scope([layers.conv2d, layers.conv2d_transpose],
-                   normalizer_fn=None,
-                   normalizer_params=None,
-                   activation_fn=tf.nn.relu,
-                   weights_regularizer=reg):
-        upconv5 = layers.conv2d_transpose(bottleneck, decoder_filters[4], [3, 3], stride=2, scope='upconv5')  # (1, 8, 26, 256)
+                                     normalizer_fn=None,
+                                     normalizer_params=None,
+                                     activation_fn=tf.nn.relu,
+                                     weights_regularizer=reg):
+        upconv5 = layers.conv2d_transpose(bottleneck, decoder_filters[4], [3, 3], stride=2,
+                                          scope='upconv5')  # (1, 8, 26, 256)
         x5 = _concat_and_pad(upconv5, econv4, padding_mode)  # (1, 10, 28, 512)
-        iconv5 = layers.conv2d(x5,decoder_filters[4], [3, 3],stride=1, scope='iconv5',padding='VALID')  # (1, 8, 26, 256)
+        iconv5 = layers.conv2d(x5, decoder_filters[4], [3, 3], stride=1, scope='iconv5',
+                               padding='VALID')  # (1, 8, 26, 256)
 
-        upconv4 = layers.conv2d_transpose(iconv5, decoder_filters[3], [3, 3], stride=2, scope='upconv4')  # (1, 16, 52, 128)
+        upconv4 = layers.conv2d_transpose(iconv5, decoder_filters[3], [3, 3], stride=2,
+                                          scope='upconv4')  # (1, 16, 52, 128)
         x4 = _concat_and_pad(upconv4, econv3, padding_mode)  # (1, 18, 54, 256)
-        iconv4 = layers.conv2d(x4,decoder_filters[3], [3, 3],stride=1,scope='iconv4',padding='VALID')  # (1, 16, 52, 128)
+        iconv4 = layers.conv2d(x4, decoder_filters[3], [3, 3], stride=1, scope='iconv4',
+                               padding='VALID')  # (1, 16, 52, 128)
 
-        upconv3 = layers.conv2d_transpose(iconv4, decoder_filters[2], [3, 3], stride=2, scope='upconv3')  # (1, 32, 104, 64)
+        upconv3 = layers.conv2d_transpose(iconv4, decoder_filters[2], [3, 3], stride=2,
+                                          scope='upconv3')  # (1, 32, 104, 64)
         x3 = _concat_and_pad(upconv3, econv2, padding_mode)  # (1, 34, 106, 128)
-        iconv3 = layers.conv2d(x3,decoder_filters[2], [3, 3],stride=1,scope='iconv3',padding='VALID')  # (1, 32, 104, 64)
+        iconv3 = layers.conv2d(x3, decoder_filters[2], [3, 3], stride=1, scope='iconv3',
+                               padding='VALID')  # (1, 32, 104, 64)
 
-        upconv2 = layers.conv2d_transpose(iconv3, decoder_filters[1], [3, 3], stride=2, scope='upconv2')  # (1, 64, 208, 32)
+        upconv2 = layers.conv2d_transpose(iconv3, decoder_filters[1], [3, 3], stride=2,
+                                          scope='upconv2')  # (1, 64, 208, 32)
         x2 = _concat_and_pad(upconv2, econv1, padding_mode)  # (1, 66, 210, 96)
-        iconv2 = layers.conv2d( x2,decoder_filters[1], [3, 3],stride=1, scope='iconv2', padding='VALID')  # (1, 64, 208, 32)
+        iconv2 = layers.conv2d(x2, decoder_filters[1], [3, 3], stride=1, scope='iconv2',
+                               padding='VALID')  # (1, 64, 208, 32)
 
-        upconv1 = layers.conv2d_transpose(iconv2, decoder_filters[0], [3, 3], stride=2, scope='upconv1')  # (1, 128, 416, 16)
-        x1 = tf.pad( upconv1, [[0, 0], [1, 1], [1, 1], [0, 0]], mode=padding_mode)  # (1, 130, 418, 16)
-        iconv1 = layers.conv2d(x1,decoder_filters[0], [3, 3],stride=1,scope='iconv1',padding='VALID')  # (1, 128, 416, 16)
+        upconv1 = layers.conv2d_transpose(iconv2, decoder_filters[0], [3, 3], stride=2,
+                                          scope='upconv1')  # (1, 128, 416, 16)
+        x1 = tf.pad(upconv1, [[0, 0], [1, 1], [1, 1], [0, 0]], mode=padding_mode)  # (1, 130, 418, 16)
+        iconv1 = layers.conv2d(x1, decoder_filters[0], [3, 3], stride=1, scope='iconv1',
+                               padding='VALID')  # (1, 128, 416, 16)
 
         depth_input = tf.pad(iconv1, [[0, 0], [1, 1], [1, 1], [0, 0]], mode=padding_mode)  # (1, 130, 418, 16)
 
-        out = layers.conv2d(depth_input,1, [3, 3],stride=1,activation_fn=tf.nn.softplus, normalizer_fn=None,scope='disp1',padding='VALID')  # (1, 128, 416, 1)
+        out = layers.conv2d(depth_input, 1, [3, 3], stride=1, activation_fn=tf.nn.softplus, normalizer_fn=None,
+                            scope='disp1', padding='VALID')  # (1, 128, 416, 1)
 
     y = iconv5
 
@@ -381,11 +398,11 @@ def depthnet_demo():
     econv4_vars = np.random.rand(1, 8, 26, 256)
     econv5_vars = np.random.rand(1, 4, 13, 512)
     sess.run(y, feed_dict={target_image: target_image_vars,
-                           econv1:econv1_vars,
-                           econv2:econv2_vars,
-                           econv3:econv3_vars,
-                           econv4:econv4_vars,
-                           econv5:econv5_vars})
+                           econv1: econv1_vars,
+                           econv2: econv2_vars,
+                           econv3: econv3_vars,
+                           econv4: econv4_vars,
+                           econv5: econv5_vars})
     print(" input shappe: ", end='')
     print(target_image.shape)
     print("output shappe: ", end='')
@@ -393,5 +410,28 @@ def depthnet_demo():
     pass
 
 
+def create_scales(constraint_minimum):
+    def constraint(x):
+        return tf.nn.relu(x - constraint_minimum) + constraint_minimum
+
+    with tf.variable_scope('Scales', initializer=0.01, constraint=constraint):
+        rot_scale = tf.get_variable('rotation')
+        trans_scale = tf.get_variable('translation')
+
+    return rot_scale, trans_scale
+
+
+def scale_demo():
+    r, t = create_scales(0.001)
+    r = r-t
+    initialize_op = tf.global_variables_initializer()
+    sess = tf.Session()
+    sess.run(initialize_op)
+    # Evaluate the tensor `c`.
+    print(sess.run(r))
+
+    pass
+
+
 if __name__ == '__main__':
-    depthnet_demo()
+    tensorflow_demo3()
