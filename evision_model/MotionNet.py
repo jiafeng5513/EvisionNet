@@ -4,6 +4,8 @@ A network for predicting ego-motion, a 3D translation field and intrinsics.
 
 based on "Depth from video in the wild" and "SfmLearner-PyTorch"
 
+U-Net liekd encoder-decoder architecture
+
 code by jiafeng5513
 
 NOTE:
