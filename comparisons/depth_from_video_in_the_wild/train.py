@@ -112,8 +112,7 @@ def main(_):
         queue_size=FLAGS.queue_size,
         input_file=FLAGS.input_file)
 
-    _train(train_model, FLAGS.checkpoint_dir, FLAGS.train_steps,
-           FLAGS.summary_freq)
+    _train(train_model, FLAGS.checkpoint_dir, FLAGS.train_steps, FLAGS.summary_freq)
 
     if FLAGS.debug:
         _print_losses(os.path.join(FLAGS.checkpoint_dir, 'debug'))

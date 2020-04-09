@@ -53,32 +53,12 @@ class Model(object):
 
     # pylint: disable=unused-argument
     # (we grab the arguments using locals())
-    def __init__(self,
-                 data_dir=None,
-                 file_extension='png',
-                 is_training=True,
-                 learning_rate=1e-4,
-                 beta1=0.9,
-                 reconstr_weight=0.85,
-                 smooth_weight=1e-2,
-                 ssim_weight=3.0,
-                 batch_size=4,
-                 img_height=128,
-                 img_width=416,
-                 imagenet_norm=True,
-                 weight_reg=1e-2,
-                 random_scale_crop=False,
-                 random_color=True,
-                 shuffle=True,
-                 input_file='train',
-                 depth_consistency_loss_weight=1e-2,
-                 queue_size=2000,
-                 motion_smoothing_weight=1e-3,
-                 rotation_consistency_weight=1e-3,
-                 translation_consistency_weight=1e-2,
-                 foreground_dilation=8,
-                 learn_intrinsics=True,
-                 boxify=True):
+    def __init__(self, data_dir=None, file_extension='png', is_training=True, learning_rate=1e-4, beta1=0.9,
+                 reconstr_weight=0.85, smooth_weight=1e-2, ssim_weight=3.0, batch_size=4, img_height=128, img_width=416,
+                 imagenet_norm=True, weight_reg=1e-2, random_scale_crop=False, random_color=True, shuffle=True,
+                 input_file='train', depth_consistency_loss_weight=1e-2, queue_size=2000, motion_smoothing_weight=1e-3,
+                 rotation_consistency_weight=1e-3, translation_consistency_weight=1e-2,
+                 foreground_dilation=8, learn_intrinsics=True, boxify=True):
         args = locals()
         for k in sorted(args):
             self.__dict__[k] = args[k]
@@ -126,30 +106,16 @@ class Model(object):
 
     def _build_loss(self):
         """Builds the loss tensor, to be minimized by the optimizer."""
-        self.reader = reader.DataReader(
-            self.data_dir,
-            self.batch_size,
-            self.img_height,
-            self.img_width,
-            SEQ_LENGTH,
-            1,  # num_scales
-            self.file_extension,
-            self.random_scale_crop,
-            reader.FLIP_RANDOM,
-            self.random_color,
-            self.imagenet_norm,
-            self.shuffle,
-            self.input_file,
-            queue_size=self.queue_size)
+        self.reader = reader.DataReader(self.data_dir, self.batch_size, self.img_height, self.img_width, SEQ_LENGTH,
+            1, self.file_extension, self.random_scale_crop, reader.FLIP_RANDOM, self.random_color, self.imagenet_norm,
+            self.shuffle, self.input_file, queue_size=self.queue_size)
 
-        (self.image_stack, self.image_stack_norm, self.seg_stack,
-         self.intrinsic_mat, _) = self.reader.read_data()
+        (self.image_stack, self.image_stack_norm, self.seg_stack, self.intrinsic_mat, _) = self.reader.read_data()
         if self.learn_intrinsics:
             self.intrinsic_mat = None
         if self.intrinsic_mat is None and not self.learn_intrinsics:
-            raise RuntimeError('Could not read intrinsic matrix. Turn '
-                               'learn_intrinsics on to learn it instead of loading '
-                               'it.')
+            raise RuntimeError('Could not read intrinsic matrix. Turn learn_intrinsics on to learn it instead of '
+                               'loading it.')
         self.export('self.image_stack', self.image_stack)
 
         object_masks = []
@@ -184,8 +150,7 @@ class Model(object):
         tf.summary.image('Masks', self.seg_stack)
 
         with tf.variable_scope(DEPTH_SCOPE):
-            # Organized by ...[i][scale].  Note that the order is flipped in
-            # variables in build_loss() below.
+            # Organized by ...[i][scale].  Note that the order is flipped in variables in build_loss() below.
             self.disp = {}
             self.depth = {}
 
@@ -194,19 +159,15 @@ class Model(object):
             # noise we use can become negative. Further experimentation is needed to
             # find if non-negativity is indeed needed.
             noise_stddev = 0.5 * tf.square(
-                tf.minimum(
-                    tf.to_float(self.global_step) /
-                    float(LAYER_NORM_NOISE_RAMPUP_STEPS), 1.0))
+                tf.minimum(tf.to_float(self.global_step) / float(LAYER_NORM_NOISE_RAMPUP_STEPS), 1.0))
 
             def _normalizer_fn(x, is_train, name='bn'):
-                return randomized_layer_normalization.normalize(
-                    x, is_train=is_train, name=name, stddev=noise_stddev)
+                return randomized_layer_normalization.normalize(x, is_train=is_train, name=name, stddev=noise_stddev)
 
             with tf.variable_scope(tf.get_variable_scope(), reuse=tf.AUTO_REUSE):
                 for i in range(SEQ_LENGTH):
                     image = self.image_stack_norm[:, :, :, 3 * i:3 * (i + 1)]
-                    self.depth[i] = depth_prediction_net.depth_prediction_resnet18unet(
-                        image, True, self.weight_reg, _normalizer_fn)
+                    self.depth[i] = depth_prediction_net.depth_prediction_resnet18unet(image, True, self.weight_reg, _normalizer_fn)
                     self.disp[i] = 1.0 / self.depth[i]
 
         with tf.name_scope('compute_loss'):
@@ -220,20 +181,15 @@ class Model(object):
                 for i in range(SEQ_LENGTH):
                     disp_smoothing = self.disp[i]
                     # Perform depth normalization, dividing by the mean.
-                    mean_disp = tf.reduce_mean(
-                        disp_smoothing, axis=[1, 2, 3], keep_dims=True)
+                    mean_disp = tf.reduce_mean(disp_smoothing, axis=[1, 2, 3], keep_dims=True)
                     disp_input = disp_smoothing / mean_disp
-                    self.smooth_loss += _depth_smoothness(
-                        disp_input, self.image_stack[:, :, :, 3 * i:3 * (i + 1)])
+                    self.smooth_loss += _depth_smoothness(disp_input, self.image_stack[:, :, :, 3 * i:3 * (i + 1)])
 
             self.rot_loss = 0.0
             self.trans_loss = 0.0
 
             def add_result_to_loss_and_summaries(endpoints, i, j):
-                tf.summary.image(
-                    'valid_mask%d%d' % (i, j),
-                    tf.expand_dims(endpoints['depth_proximity_weight'], -1))
-
+                tf.summary.image('valid_mask%d%d' % (i, j), tf.expand_dims(endpoints['depth_proximity_weight'], -1))
                 self.depth_consistency_loss += endpoints['depth_error']
                 self.reconstr_loss += endpoints['rgb_error']
                 self.ssim_loss += 0.5 * endpoints['ssim_error']
@@ -248,12 +204,11 @@ class Model(object):
                     depth_j = self.depth[j][:, :, :, 0]
                     image_j = self.image_stack[:, :, :, 3 * j:3 * (j + 1)]
                     image_i = self.image_stack[:, :, :, i * 3:(i + 1) * 3]
-                    # We select a pair of consecutive images (and their respective
-                    # predicted depth maps). Now we have the network predict a motion
-                    # field that connects the two. We feed the pair of images into the
-                    # network, once in forward order and then in reverse order. The
-                    # results are fed into the loss calculation. The following losses are
-                    # calculated:
+                    # We select a pair of consecutive images (and their respective predicted depth maps).
+                    # Now we have the network predict a motion field that connects the two.
+                    # We feed the pair of images into the network, once in forward order and then in reverse order.
+                    # The results are fed into the loss calculation.
+                    # The following losses are calculated:
                     # - RGB and SSIM photometric consistency.
                     # - Cycle consistency of rotations and translations for every pixel.
                     # - L1 smoothness of the disparity and the motion field.
@@ -287,26 +242,19 @@ class Model(object):
 
                     self.motion_smoothing += _smoothness(trans)
                     self.motion_smoothing += _smoothness(inv_trans)
-                    tf.summary.scalar(
-                        'trans_stdev',
-                        tf.sqrt(0.5 *
-                                tf.reduce_mean(tf.square(trans) + tf.square(inv_trans))))
+                    tf.summary.scalar( 'trans_stdev', tf.sqrt(0.5 * tf.reduce_mean(tf.square(trans) + tf.square(inv_trans))))
 
-                    transformed_depth_j = transform_depth_map.using_motion_vector(
-                        depth_j, trans, rot, intrinsic_mat)
+                    transformed_depth_j = transform_depth_map.using_motion_vector(depth_j, trans, rot, intrinsic_mat)
 
                     add_result_to_loss_and_summaries(
                         consistency_losses.rgbd_and_motion_consistency_loss(
-                            transformed_depth_j, image_j, depth_i, image_i, rot,
-                            trans, inv_rot, inv_trans), i, j)
+                            transformed_depth_j, image_j, depth_i, image_i, rot, trans, inv_rot, inv_trans), i, j)
 
-                    transformed_depth_i = transform_depth_map.using_motion_vector(
-                        depth_i, inv_trans, inv_rot, intrinsic_mat)
+                    transformed_depth_i = transform_depth_map.using_motion_vector(depth_i, inv_trans, inv_rot, intrinsic_mat)
 
                     add_result_to_loss_and_summaries(
                         consistency_losses.rgbd_and_motion_consistency_loss(
-                            transformed_depth_i, image_i, depth_j, image_j, inv_rot,
-                            inv_trans, rot, trans), j, i)
+                            transformed_depth_i, image_i, depth_j, image_j, inv_rot,inv_trans, rot, trans), j, i)
 
             # Build the total loss as composed of L1 reconstruction, SSIM, smoothing
             # and object size constraint loss as appropriate.

@@ -20,7 +20,7 @@ from __future__ import division
 from __future__ import print_function
 
 import tensorflow.compat.v1 as tf  # tf
-from depth_from_video_in_the_wild import transform_utils
+import transform_utils
 from tensorflow.contrib import resampler as contrib_resampler
 
 
