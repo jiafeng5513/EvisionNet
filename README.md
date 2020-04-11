@@ -80,8 +80,9 @@ EvisonNet
 7. from Table.1 and Table.3 in struct2depth paper.<br>
 8. from Table.1 and Table.6 in the Depth from Video in the wild paper.<br>
 9. from Table.1 and Table.6 in the Depth from Video in the wild paper.<br>
-10. struct2depth 和 Depth from Video in the wild 这两个工作很难复现,主要问题是作者没有给出motion mask的生成方法,我遇到的具体问题和[VinerntCa](https://github.com/tensorflow/models/issues/7410)一致,但是作者并没有给出正面答复.<br>
+10. struct2depth 和 Depth from Video in the wild 这两个工作除了使用KITTI等训练数据集,还使用了一个目标检测模型来生成“object mask”,其作用是在motion mask的生成上进行边界限定.<br>
 11. struct2deptht提供了预训练的模型可以进行测试,Depth from Video in the wild的模型下载链接全部都删除了.<br>
+
 
 ### 7.评价指标说明
 1. 深度指标:<br>

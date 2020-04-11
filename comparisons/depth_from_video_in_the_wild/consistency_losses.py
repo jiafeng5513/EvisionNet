@@ -24,30 +24,24 @@ import transform_utils
 from tensorflow.contrib import resampler as contrib_resampler
 
 
-def rgbd_consistency_loss(frame1transformed_depth, frame1rgb, frame2depth,
-                          frame2rgb):
+def rgbd_consistency_loss(frame1transformed_depth, frame1rgb, frame2depth, frame2rgb):
   """Computes a loss that penalizes RGB and depth inconsistencies betwen frames.
 
-  This function computes 3 losses that penalize inconsistencies between two
-  frames: depth, RGB, and structural similarity. It IS NOT SYMMETRIC with
-  respect to both frames. In particular, to address occlusions, it only
-  penalizes depth and RGB inconsistencies at pixels where frame1 is closer to
-  the camera than frame2. (Why? see https://arxiv.org/abs/1904.04998). Therefore
-  the intended usage pattern is running it twice - second time with the two
-  frames swapped.
+  This function computes 3 losses that penalize inconsistencies between two frames: depth, RGB, and structural similarity.
+  It IS NOT SYMMETRIC with respect to both frames.
+  In particular, to address occlusions,
+  it only penalizes depth and RGB inconsistencies at pixels where frame1 is closer to the camera than frame2.
+  (Why? see https://arxiv.org/abs/1904.04998).
+  Therefore the intended usage pattern is running it twice - second time with the two frames swapped.
 
   Args:
-    frame1transformed_depth: A transform_depth_map.TransformedDepthMap object
-      representing the depth map of frame 1 after it was motion-transformed to
-      frame 2, a motion transform that accounts for all camera and object motion
-      that occurred between frame1 and frame2. The tensors inside
-      frame1transformed_depth are of shape [B, H, W].
-    frame1rgb: A tf.Tensor of shape [B, H, W, C] containing the RGB image at
-      frame1.
-    frame2depth: A tf.Tensor of shape [B, H, W] containing the depth map at
-      frame2.
-    frame2rgb: A tf.Tensor of shape [B, H, W, C] containing the RGB image at
-      frame2.
+    frame1transformed_depth: A transform_depth_map.
+        TransformedDepthMap object representing the depth map of frame 1 after it was motion-transformed to frame 2,
+        a motion transform that accounts for all camera and object motion that occurred between frame1 and frame2.
+        The tensors inside frame1transformed_depth are of shape [B, H, W].
+    frame1rgb: A tf.Tensor of shape [B, H, W, C] containing the RGB image at frame1.
+    frame2depth: A tf.Tensor of shape [B, H, W] containing the depth map at frame2.
+    frame2rgb: A tf.Tensor of shape [B, H, W, C] containing the RGB image at frame2.
 
   Returns:
     A dicionary from string to tf.Tensor, with the following entries:
