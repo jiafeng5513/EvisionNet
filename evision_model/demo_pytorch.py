@@ -73,10 +73,30 @@ def demo_dilate():
     pass
 
 
+def demo_expdim():
+    x_1 = tf.placeholder(tf.int32, shape=[3])
+    x_2 = tf.placeholder(tf.int32, shape=[3])
+
+    #y = tf.meshgrid(x_1, x_2)
+    s = torch.stack(tf.meshgrid(tf.range(3), tf.range(5), (1,)))
+    y = torch.squeeze(s, axis=3)
+
+    initialize_op = tf.global_variables_initializer()
+    sess = tf.Session()
+    sess.run(initialize_op)
+
+    x_1_v = [1, 2, 3]
+    x_2_v = [4, 5, 6]
+
+    r = sess.run(y, feed_dict={x_1: x_1_v,x_2: x_2_v})
+   # print(y.shape)
+    print(r)
+    pass
+
 if __name__ == '__main__':
-    demo_dilate()
-    # input = torch.empty(3, 5, 7, 9)
-    # N,C,H,W = input.shape
-    # shape_list = [N,C,H,W]
-    #
-    # print(input.reshape([-1]).shape)
+    # demo_expdim()
+    width = 3
+    height = 5
+    grid = torch.stack(torch.meshgrid(torch.range(start=0, end = width), torch.range(start=0, end = height)))
+    print(grid)
+
