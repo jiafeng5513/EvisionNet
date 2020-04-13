@@ -1,5 +1,13 @@
-TensorFlow 到 PyTorch 迁移指南
+### Migration Guide for TensorFlow To PyTorch
 
-1. torch.unsqueeze(x, 1) 等价于 tf.expand_dims(x, 1)
-2. tf.squeeze 等价于 torch.squeeze
-3. 
+|序号|TensorFlow|PyTorch|备注|
+|:---:|:---:|:---:|:---:|
+|1| tf.expand_dims(x, 1)|torch.unsqueeze(x, 1)||
+|2| tf.squeeze | torch.squeeze||
+|3| tf.einsum | torch.einsum ||
+|4| tf.transpose(rot_mat, [0, 3, 4, 1, 2])|rot_mat.permute(0, 3, 4, 1, 2)||
+|5| tf.unstack(x,dim=1)|torch.unbind(x,dim=1)||
+|6| tf.is_nan() |torch.isnan()||
+|7| tf.logical_and(x,y) | x.mul(y).bool()||
+|8| tf.clip_by_value(x, min, max) | torch.clamp(input,min,max) ||
+|9| tf.reduce_all(x, axis=0) | x.prod(dim=0).bool() ||

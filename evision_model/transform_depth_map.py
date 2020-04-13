@@ -7,7 +7,6 @@ from __future__ import division
 from __future__ import print_function
 
 import torch
-import torch.nn as nn
 import transform_utils
 
 
@@ -115,11 +114,11 @@ def _using_motion_vector(depth, translation, rotation_angles, intrinsic_mat):
     """A helper for using_motion_vector. See docstring therein."""
 
     if len(translation.shape) not in (2, 4):
-        raise ValueError('\'translation\' should have rank 2 or 4, not %d' % translation.shape.ndims)
+        raise ValueError('\'translation\' should have rank 2 or 4, not %d' % len(translation.shape))
     if translation.shape[1] != 3:
-        raise ValueError('translation\'s last dimension should be 3, not %d' % translation.shape[1])
+        raise ValueError('translation\'s channel dimension should be 3, not %d' % translation.shape[1])
     if len(translation.shape) == 2:
-        translation = torch.unsqueeze(torch.unsqueeze(translation, 1), 1)
+        translation = torch.unsqueeze(torch.unsqueeze(translation, -1), -1)
 
     _, height, width = depth.shape
     grid = torch.stack(torch.meshgrid(torch.range(width), torch.range(height)))
@@ -138,78 +137,68 @@ def _using_motion_vector(depth, translation, rotation_angles, intrinsic_mat):
         projected_rotation = torch.einsum('bij,bjk,bkl->bil', intrinsic_mat, rot_mat, intrinsic_mat_inv)
         pcoords = torch.einsum('bij,jhw,bhw->bihw', projected_rotation, grid, depth)
     elif len(rotation_angles.shape) == 4:
-        # We push the H and W dimensions to the end, and transpose the rotation
-        # matrix elements (as noted above).
-        rot_mat = tf.transpose(rot_mat, [0, 3, 4, 1, 2])
-        projected_rotation = tf.einsum('bij,bjkhw,bkl->bilhw', intrinsic_mat, rot_mat, intrinsic_mat_inv)
-        pcoords = tf.einsum('bijhw,jhw,bhw->bihw', projected_rotation, grid, depth)
+        # We push the H and W dimensions to the end, and transpose the rotation matrix elements (as noted above).
+        rot_mat = rot_mat.permute(0, 3, 4, 1, 2)
+        projected_rotation = torch.einsum('bij,bjkhw,bkl->bilhw', intrinsic_mat, rot_mat, intrinsic_mat_inv)
+        pcoords = torch.einsum('bijhw,jhw,bhw->bihw', projected_rotation, grid, depth)
 
-    projected_translation = tf.einsum('bij,bhwj->bihw', intrinsic_mat, translation)
+    projected_translation = torch.einsum('bij,bhwj->bihw', intrinsic_mat, translation)
     pcoords += projected_translation
-    x, y, z = tf.unstack(pcoords, axis=1)
+    x, y, z = torch.unbind(pcoords, axis=1)
     return x / z, y / z, z
 
 
 def _using_motion_vector_with_distortion(depth, translation, rotation_angles, intrinsic_mat, distortion_coeff=0.0):
     """A helper for using_motion_vector. See docstring therein."""
 
-    if translation.shape.ndims not in (2, 4):
-        raise ValueError('\'translation\' should have rank 2 or 4, not %d' %
-                         translation.shape.ndims)
-    if translation.shape[-1] != 3:
-        raise ValueError('translation\'s last dimension should be 3, not %d' %
-                         translation.shape[1])
-    if translation.shape.ndims == 2:
-        translation = tf.expand_dims(tf.expand_dims(translation, 1), 1)
+    if len(translation.shape) not in (2, 4):
+        raise ValueError('\'translation\' should have rank 2 or 4, not %d' % len(translation.shape))
+    if translation.shape[1] != 3:
+        raise ValueError('translation\'s channel dimension should be 3, not %d' % translation.shape[1])
+    if len(translation.shape) == 2:
+        translation = torch.unsqueeze(torch.unsqueeze(translation, -1), -1)
 
-    _, height, width = tf.unstack(tf.shape(depth))
-    grid = tf.squeeze(
-        tf.stack(tf.meshgrid(tf.range(width), tf.range(height), (1,))),
-        axis=3)  # 3 x height x width
-    grid = tf.to_float(grid)
-    intrinsic_mat_inv = tf.linalg.inv(intrinsic_mat)
+    _, height, width = depth.shape
+    grid = torch.stack(torch.meshgrid(torch.range(width), torch.range(height)))
+    grid = grid.float()
+    intrinsic_mat_inv = torch.inverse(intrinsic_mat)
 
-    normalized_grid = tf.einsum('bij,jhw->bihw', intrinsic_mat_inv, grid)
-    radii_squared = tf.reduce_sum(tf.square(normalized_grid[:, :2, :, :]), axis=1)
+    normalized_grid = torch.einsum('bij,jhw->bihw', intrinsic_mat_inv, grid)
 
-    undistortion_factor = quadratic_inverse_distortion_scale(
-        distortion_coeff, radii_squared)
-    undistortion_factor = tf.stack([
-        undistortion_factor, undistortion_factor,
-        tf.ones_like(undistortion_factor)
-    ],
-        axis=1)
+    radii_squared = torch.sum(normalized_grid[:, :2, :, :].mul(normalized_grid), dim=1)
+
+    undistortion_factor = quadratic_inverse_distortion_scale(distortion_coeff, radii_squared)
+    undistortion_factor = torch.stack(
+        [undistortion_factor, undistortion_factor, torch.ones_like(undistortion_factor)], dim=1)
     normalized_grid *= undistortion_factor
 
     rot_mat = transform_utils.matrix_from_angles(rotation_angles)
     # We have to treat separately the case of a per-image rotation vector and a
     # per-image rotation field, because the broadcasting capabilities of einsum
     # are limited.
-    if rotation_angles.shape.ndims == 2:
+    if len(rotation_angles.shape) == 2:
         # The calculation here is identical to the one in inverse_warp above.
         # Howeverwe use einsum for better clarity. Under the hood, einsum performs
         # the reshaping and invocation of BatchMatMul, instead of doing it manually,
         # as in inverse_warp.
-        pcoords = tf.einsum('bij,bjhw,bhw->bihw', rot_mat, normalized_grid, depth)
-    elif rotation_angles.shape.ndims == 4:
+        pcoords = torch.einsum('bij,bjhw,bhw->bihw', rot_mat, normalized_grid, depth)
+    elif len(rotation_angles.shape) == 4:
         # We push the H and W dimensions to the end, and transpose the rotation
         # matrix elements (as noted above).
-        rot_mat = tf.transpose(rot_mat, [0, 3, 4, 1, 2])
-        pcoords = tf.einsum('bijhw,bjhw,bhw->bihw', rot_mat, normalized_grid, depth)
+        rot_mat = rot_mat.permute(0, 3, 4, 1, 2)
+        pcoords = torch.einsum('bijhw,bjhw,bhw->bihw', rot_mat, normalized_grid, depth)
 
-    pcoords += tf.transpose(translation, [0, 3, 1, 2])
+    pcoords += translation.permute(0, 3, 1, 2)
 
-    x, y, z = tf.unstack(pcoords, axis=1)
+    x, y, z = torch.unbind(pcoords, dim=1)
     x /= z
     y /= z
-    scale = quadraric_distortion_scale(distortion_coeff,
-                                       tf.square(x) + tf.square(y))
+    scale = quadraric_distortion_scale(distortion_coeff, x.mul(x) + y.mul(y))
     x *= scale
     y *= scale
 
-    pcoords = tf.einsum('bij,bjhw->bihw', intrinsic_mat,
-                        tf.stack([x, y, tf.ones_like(x)], axis=1))
-    x, y, _ = tf.unstack(pcoords, axis=1)
+    pcoords = torch.einsum('bij,bjhw->bihw', intrinsic_mat, torch.stack([x, y, torch.ones_like(x)], dim=1))
+    x, y, _ = torch.unbind(pcoords, dim=1)
 
     return x, y, z
 
@@ -236,32 +225,29 @@ def _clamp_and_filter_result(pixel_x, pixel_y, z):
     and True everywhere else, that is, where pixel_x, pixel_y are finite and
     fall within the frame.
   """
-    with tf.name_scope('Clamp', values=[pixel_x, pixel_y, z]):
-        _, height, width = tf.unstack(tf.shape(pixel_x))
 
-        def _tensor(x):
-            return tf.to_float(tf.convert_to_tensor(x))
+    _, height, width = pixel_x.shape
 
-        x_not_underflow = pixel_x >= 0.0
-        y_not_underflow = pixel_y >= 0.0
-        x_not_overflow = pixel_x < _tensor(width - 1)
-        y_not_overflow = pixel_y < _tensor(height - 1)
-        z_positive = z > 0.0
-        x_not_nan = tf.math.logical_not(tf.is_nan(pixel_x))
-        y_not_nan = tf.math.logical_not(tf.is_nan(pixel_y))
-        not_nan = tf.logical_and(x_not_nan, y_not_nan)
-        not_nan_mask = tf.to_float(not_nan)
-        pixel_x *= not_nan_mask
-        pixel_y *= not_nan_mask
-        pixel_x = tf.clip_by_value(pixel_x, 0.0, _tensor(width - 1))
-        pixel_y = tf.clip_by_value(pixel_y, 0.0, _tensor(height - 1))
-        mask_stack = tf.stack([
-            x_not_underflow, y_not_underflow, x_not_overflow, y_not_overflow,
-            z_positive, not_nan
-        ],
-            axis=0)
-        mask = tf.reduce_all(mask_stack, axis=0)
-        return pixel_x, pixel_y, mask
+    def _tensor(x):
+        return torch.tensor(x).float()
+
+    x_not_underflow = pixel_x >= 0.0
+    y_not_underflow = pixel_y >= 0.0
+    x_not_overflow = pixel_x < _tensor(width - 1)
+    y_not_overflow = pixel_y < _tensor(height - 1)
+    z_positive = z > 0.0
+    x_not_nan = torch.logical_not(torch.isnan(pixel_x))
+    y_not_nan = torch.logical_not(torch.isnan(pixel_y))
+    not_nan = x_not_nan.mul(y_not_nan).bool()
+    not_nan_mask = not_nan.float()
+    pixel_x *= not_nan_mask
+    pixel_y *= not_nan_mask
+    pixel_x = torch.clamp(pixel_x, 0.0, width - 1)
+    pixel_y = torch.clamp(pixel_y, 0.0, height - 1)
+    mask_stack = torch.stack(
+        [x_not_underflow, y_not_underflow, x_not_overflow, y_not_overflow, z_positive, not_nan], axis=0)
+    mask = mask_stack.prod(dim=0).bool()
+    return pixel_x, pixel_y, mask
 
 
 def quadraric_distortion_scale(distortion_coefficient, r_squared):
@@ -290,9 +276,7 @@ def quadraric_distortion_scale(distortion_coefficient, r_squared):
     return 1 + distortion_coefficient * r_squared
 
 
-def quadratic_inverse_distortion_scale(distortion_coefficient,
-                                       distorted_r_squared,
-                                       newton_iterations=4):
+def quadratic_inverse_distortion_scale(distortion_coefficient, distorted_r_squared, newton_iterations=4):
     """Calculates the inverse quadratic distortion function given squared radii.
 
   The distortion factor is 1.0 + `distortion_coefficient` * `r_squared`. When
@@ -332,4 +316,4 @@ def quadratic_inverse_distortion_scale(distortion_coefficient,
 
 
 def _expand_last_dim_twice(x):
-    return tf.expand_dims(tf.expand_dims(x, -1), -1)
+    return torch.unsqueeze(torch.unsqueeze(x, -1), -1)
