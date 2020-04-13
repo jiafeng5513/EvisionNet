@@ -11,3 +11,5 @@
 |7| tf.logical_and(x,y) | x.mul(y).bool()||
 |8| tf.clip_by_value(x, min, max) | torch.clamp(input,min,max) ||
 |9| tf.reduce_all(x, axis=0) | x.prod(dim=0).bool() ||
+|10| tf.rank(x) | len(x.shape) ||
+|11| tf.matmul(x,y) |torch.matmul(x,y)||

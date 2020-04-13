@@ -26,22 +26,7 @@ def pytorch_test_template():
 
 
 
-def demo_logical_and():
-    x = torch.Tensor([True, False, True, False])
-    y = torch.Tensor([True, True, False, False])
-    z = x.mul(y).bool()  # tensor([ True, False, False, False])
-    print(z)
-    pass
-
-def demo_reduce_all():
-    x = torch.Tensor([[True, True, False, False], [False, True, False, True]])
-
-    z = x.prod(dim=0).bool()
-    print(z)
-
-
-    pass
 
 if __name__ == '__main__':
-    demo_reduce_all()
+
     pass
