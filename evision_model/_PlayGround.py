@@ -24,9 +24,27 @@ def pytorch_test_template():
     # function to be test
     pass
 
+def item_tensor():
+    image = torch.Tensor([[True,  True], [False, False]])  # 输入尺寸 [N C H W]
+    y = image.sum(1,keepdim=True).bool()
+    print(y)
+    pass
 
+def reduce_any_demo():
+    x = tf.constant([[True, True], [False, False]])
+    y1 = tf.reduce_any(x)  # True
+    y2 = tf.reduce_any(x, 0)  # [True, True]
+    y3 = tf.reduce_any(x, 1)  # [True, False]
+    y4 = tf.reduce_any(x, 1, keepdims=True)
+    sess = tf.Session()
+    print(sess.run(y1))
+    print(sess.run(y2))
+    print(sess.run(y3))
+    print(sess.run(y4))
+
+    pass
 
 
 if __name__ == '__main__':
-
+    item_tensor()
     pass
