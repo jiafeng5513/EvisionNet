@@ -18,3 +18,7 @@
 |14| tf.reduce_mean() |||
 |15| tf.reduce_any(x,i) | x.sum(i).bool() ||
 |15| tf.reduce_sum(x,i) | x.sum(i) ||
+|16| tf.concat(x,i)|torch.cat(x.i)||
+|18| tf.multiply |*或者torch.mul||
+|19|tf.nn.l2_normalize(x, 1)|sklearn.preprocessing.normalize(x , norm='l2')||
+|20|tf.multinomial(x, 1)|torch.multinomial(x, 1, replacement=True)||

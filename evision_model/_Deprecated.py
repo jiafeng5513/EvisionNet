@@ -17,6 +17,7 @@ NOTE:
     4. 训练时均值和方差乘以均值为1的高斯噪声
     5. 测试时使用真实的均值和方差
     6. see:https://arxiv.org/abs/1904.04998.
+    ┴ ┬ ┤ ├ ┌ ┐└ ┘ ─ ┼ │ 
 """
 
 def truncated_normal(shape, mean=0.0, stddev=1.0):

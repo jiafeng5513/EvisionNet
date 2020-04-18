@@ -46,9 +46,9 @@ LAYER_NORM_NOISE_RAMPUP_STEPS = 10000
 MIN_OBJECT_AREA = 20
 
 
-class LossFactory():
+class LossFactory(object):
     # public : 构造函数
-    def __init__(self, SEQ_LENGTH=3, reconstr_weight=0.85, smooth_weight=1e-2, ssim_weight=3.0,
+    def __init__(self, SEQ_LENGTH=3, reconstr_weight=0.85, smooth_weight=1e-2, ssim_weight=1.5,
                  motion_smoothing_weight=1e-3, rotation_consistency_weight=1e-3,
                  translation_consistency_weight=1e-2, depth_consistency_loss_weight=1e-2):
         # 构造函数用于传入权重系数
@@ -63,9 +63,23 @@ class LossFactory():
         pass
 
     # public : 联合损失
-    def getTotalLoss(self):
-        # 这里用于计算联合损失函数
-        pass
+    def getTotalLoss(self, image_stack, seg_stack, depth_pred,
+                     trans, trans_res, rot, inv_trans, inv_trans_res, inv_rot, intrinsic_mat):
+        _depth_smoothing_loss = self.__Depth_Smoothing_Loss(depth_pred, image_stack)
+
+        (_motion_smoothing, _depth_consistency_loss, _reconstr_loss,
+         _ssim_loss, _rot_loss, _trans_loss) = self.__Motion_Smoothing_Loss(trans, trans_res, rot, inv_trans,
+                                                                            inv_trans_res, inv_rot, seg_stack,
+                                                                            depth_pred, intrinsic_mat, image_stack)
+        _total_loss = \
+            max(0.0, self.motion_smoothing_weight) * _motion_smoothing + \
+            max(0.0, self.smooth_weight) * _depth_smoothing_loss + \
+            max(0.0, self.depth_consistency_loss_weight) * _depth_consistency_loss + \
+            max(0.0, self.reconstr_weight) * _reconstr_loss + \
+            max(0.0, self.ssim_weight) * _ssim_loss + \
+            max(0.0, self.rotation_consistency_weight) * _rot_loss + \
+            max(0.0, self.translation_consistency_weight) * _trans_loss
+        return _total_loss
 
     # private : 深度平滑损失
     def __Depth_Smoothing_Loss(self, depth_pred, image_stack):
@@ -93,45 +107,79 @@ class LossFactory():
         return smooth_loss
         pass
 
-    # private : 场景运动平滑损失
-    def __Motion_Smoothing_Loss(self, trans, trans_res, inv_trans, inv_trans_res, seg_stack):
+    # private : 其他损失
+    def __Motion_Smoothing_Loss(self, trans, trans_res, rot, inv_trans, inv_trans_res, inv_rot, seg_stack,
+                                depth, intrinsic_mat, image_stack):
         """
         场景运动平滑损失
         TODO:seg_stack可能存在数组越界
         Args:
-            trans:          list of 平移          [b,3,1,1]
+            -----list length = self.SEQ_LENGTH - 1
+            trans:          list of 相机平移      [b,3,1,1]
             trans_res:      list of 场景运动      [b,3,h,w]
-            inv_trans:      list of 反向平移      [b,3,1,1]
-            inv_trans_res:  list of 反向场景运动  [b,3,h,w] list length = self.SEQ_LENGTH - 1
+            rot:            list of 相机旋转      []
+            inv_trans:      list of 反向相机平移  [b,3,1,1]
+            inv_trans_res:  list of 反向场景运动  [b,3,h,w]
+            inv_rot:        list of 反向相机旋转  []
+             -----list length = self.SEQ_LENGTH
+            depth:          list of 深度         []
+            intrinsic_mat: 内参
+            image_stack:          输入图片
             seg_stack:      from __get_object_masks()
 
         Returns:
             场景运动平滑损失
         """
         motion_smoothing = 0.0
+        depth_consistency_loss = 0.0
+        reconstr_loss = 0.0
+        ssim_loss = 0.0
+        rot_loss = 0.0
+        trans_loss = 0.0
         seg_stack = self.__get_object_masks(seg_stack, self.SEQ_LENGTH)
         for i in range(self.SEQ_LENGTH - 1):
             j = i + 1
             # NOTE : trans, trans_res, inv_trans, inv_trans_res are obtained like this:
             # _, trans, trans_res, _ = motion_field_net(images=tf.concat([image_i, image_j], axis=-1))
             # _, inv_trans, inv_trans_res, _ = motion_field_net(images=tf.concat([image_j, image_i], axis=-1))
-            motion_smoothing += _smoothness(trans[i] + trans_res[i] * dilate(seg_stack[:, :, :, j:j + 1]))
-            motion_smoothing += _smoothness(inv_trans[i] + inv_trans_res[i] * dilate(seg_stack[:, :, :, i:i + 1]))
-        return motion_smoothing
+            _trans = trans[i] + trans_res[i] * dilate(seg_stack[:, :, :, j:j + 1])
+            motion_smoothing += _smoothness(_trans)
+            _inv_trans = inv_trans[i] + inv_trans_res[i] * dilate(seg_stack[:, :, :, i:i + 1])
+            motion_smoothing += _smoothness(_inv_trans)
 
-    # private : 重投影损失
-    def __Reproject_Loss(self):
-        # part N: 重投影损失
-        pass
+            image_i = image_stack[:, i * 3:(i + 1) * 3, :, :]
+            image_j = image_stack[:, 3 * j:3 * (j + 1), :, :]
+
+            """    
+            if SEQ_LENGTH == 3:        
+            ┌─────┐         ─────>         ┌─────┐         ─────>         ┌─────┐
+            │  i  │  trans,trans_res,rot   │  j  │  trans,trans_res,rot   │     │
+            └─────┘         <─────         └─────┘         <─────         └─────┘
+            depth[i]        inv_s          depth[j]         inv_s          
+            """
+            transformed_depth_j = transform_depth_map.using_motion_vector(depth[j], _trans, rot[i], intrinsic_mat)
+            endpoints_j = rgbd_and_motion_consistency_loss(
+                transformed_depth_j, image_j, depth[i], image_i, rot[i], trans[i], inv_rot[i], inv_trans[i])
+
+            transformed_depth_i = transform_depth_map.using_motion_vector(depth[i], _inv_trans, inv_rot[i],
+                                                                          intrinsic_mat)
+            endpoints_i = rgbd_and_motion_consistency_loss(
+                transformed_depth_i, image_i, depth[j], image_j, inv_rot[i], inv_trans[i], rot[i], trans[i])
+
+            depth_consistency_loss += (endpoints_j['depth_error'] + endpoints_i['depth_error'])
+            reconstr_loss += (endpoints_j['rgb_error'] + endpoints_i['rgb_error'])
+            ssim_loss += (endpoints_j['ssim_error'] + endpoints_i['ssim_error'])
+            rot_loss += (endpoints_j['rotation_error'] + endpoints_i['rotation_error'])
+            trans_loss += (endpoints_j['translation_error'] + endpoints_i['translation_error'])
+
+        return motion_smoothing, depth_consistency_loss, reconstr_loss, ssim_loss, rot_loss, trans_loss
 
     # private : object mask (seg_stack)
-    def __get_object_masks(self, seg_stack, SEQ_LENGTH):
+    def __get_object_masks(self, seg_stack):
         """
         可运动目标掩码
         Args:
             seg_stack:      from data loader
-            SEQ_LENGTH:
-
         Returns:
         处理好的可运动目标掩码
         """
@@ -140,7 +188,7 @@ class LossFactory():
         for i in range(batch_size):
             object_ids = torch.unique(seg_stack[i].reshape([-1]))[0]
             object_masks_i = []
-            for j in range(SEQ_LENGTH):
+            for j in range(self.SEQ_LENGTH):
                 current_seg = seg_stack[i, j * 3, :, :]  # (H, W)
 
                 def process_obj_mask(obj_id):
