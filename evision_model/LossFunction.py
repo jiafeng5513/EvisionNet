@@ -4,43 +4,63 @@ Loss Function for EvisionNet
 
 based on "Depth from video in the wild", "SfmLearner-PyTorch", "SfmLearner-TF" and "struct2depth"
 
-Total Loss = Depth Smoothing +          # 2. 深度平滑
-             Motion Smoothing +         # 4. 运动平滑(需要seg_stack即object_mask)
-             Reconstr loss +            # 1. 重投影损失
-             ssim loss +                # 3. structural similarity index,结构相似性损失
-             Depth Consistency loss +   # 5.
+Total Loss = Depth Smoothing +          # [done] 1. image-aware 深度平滑损失
+             Motion Smoothing +         # 2. 运动平滑(需要seg_stack即object_mask)
+             Reconstr loss +            # 3. 惩罚
+             ssim loss +                # 4. structural similarity index,结构相似性损失
+             Depth Consistency loss +   # 5. 深度一致性损失
              Rot_loss +                 # 6. 旋转损失
              Trans_loss                 # 7. 平移损失
-
             (以上各项均带有权重系数超参数)
 code by jiafeng5513
 
-NOTE:
-    1. TensorFlow 的默认顺序是 [N H W C], PyTorch的默认顺序是 [N C H W]
-    2. 计算损失的最小单位是一个batch,一个batch含有batch size 个 SEQ_LENGTH长度的图片单元,
-       每个图片单元是预处理时生成的一张连体照片由SEQ_LENGTH个连续帧组成
-    3. image的联结方式是在C维度,也就是通道上进行连接
-    4. 由于2,每次计算损失时,关于深度的损失有SEQ_LENGTH个,关于ego-motion的损失有SEQ_LENGTH-1个
-    5. 每相邻的两张image进MotionNet,然后再调换这两张image的顺序.
-        假设SEQ_LENGTH=5,那么MotionNet需要这样计算: 12/21,23/32,34/43,45/54,共(SEQ_LENGTH-1)*2次
-        其中正序的一组存储在rotation_pred,translation_pred,residual_translation_pred,intrinsic_pred中
-        逆序的一组存储在inv_rotation_pred,inv_translation_pred,inv_residual_translation_pred,inv_intrinsic_pred中
-    6.
+联合无监督学习原理:
+数据集中含有视频,我们提取相邻的两帧Ps,Pt来看,
+我们有DepthNet,可以根据单帧图像得到深度图:Ds,Dt,有MotionNet能够输入相邻的两帧获得相机的运动r,t,还能获得相机内参K,
+inv_K代表K的逆矩阵.
+            ┌──────┐         ─────>         ┌──────┐
+            │  Ps  │          r,t           │  Pt  │
+            └──────┘         <─────         └──────┘
+               Ds          inv_r,inv_t         Dt
+            Ds * Ps = K * R * Dt * inv_K * Pt +K * t
+1. 根据这个式子,我们可以从左边解出Ds,此时这个D's是合成的,我们可以把它跟DepthNet输出的Ds进行比较,这就是深度一致性损失
+   实际操作时,我们统计D's[i,j]<Ds[i,j]的位置,只有这些位置的深度值参与深度一致性损失,
+2. 为了惩罚D's[i,j]全部大于Ds[i,j]的行为,对于所有D's[i,j]<Ds[i,j]的[i,j],累加|Ps[i,j]-Ps[i,j]|,并在RGB三个通道上做均值,
+    这就是rgb_error
+3. 进一步的惩罚采用结构相似性.首先计算所有D's[i,j]<Ds[i,j]处深度差值的标准差,并以此计算权重函数,
+    该权重函数w[i,j]的特点是当深度差小于标准偏差时,达到1.0，否则很小,这就是ssim loss,
+    这一步惩罚的理由是: 如果[i,j]处的重投影深度与预测深度差的太多,这个地方很可能发生了遮挡,
+    我们给没发生遮挡的那些位置多加一些损失值,给遮挡的地方少加一点,变相降低了可能发生了遮挡的那些位置在联合损失中的权重.
+4. 我们的MotionNet还输出了一个[B,3,h,w]的被称为"平移场"的东西,这个东西代表这么一种含义:
+    假设在Ps和Pt这两帧之间,相机完全没有移动,但是物体移动了,那么每个像素移动了多少呢?那就由[b,3,i,j]这个平移向量给出,
+    因为表示的是背景的运动,而且是一个由平移向量构成的东西,所以我们有时候也把他叫做"残差平移场",或者"背景平移场",
+    那么现在考虑相机的运动,就相当于在每一个[b,3,i,j]平移向量的基础上,再增加一个公共的平移向量(也就是相机平移向量).
+    这样的好处是显而易见的,相比于粗放的使用一个[b,3]平移向量描述所有点的平移,我们的这种方法显然更加的细致和合理.
+    毕竟由于各种各样的奇怪因素,场景中的像素并不总是满足同一个平移向量.
+    这里就引出了另一个问题:当我们对于网络寻找"背景移动"的这种能力不是很自信的时候,需要一种机制确保这个"背景平移场"里面描述的是
+    具有"背景移动能力"的那些像素,换句话说,我们先验的认为,在相机不动的时候,并不是所有的像素都能自己运动,如果我们事先找到这个场景中的
+    可移动物体的边界,那么就能过滤掉"背景平移场"中那些在这个边界之外的像素的"背景运动"
+    (因为这很可能是不合理的,由网络的某种机制引入的错误或者噪音),这个边界就是"object_mask",可以使用实例分割,目标检测等方法获得.
+    根据DFV的实验结果,一个简单的方框就够了,根据jiafeng5513的实验,这个东西用处不大.
+    总之,需要记住这么一件事:在损失函数计算的时候,只要我们说平移,他的shape就是[B,3,H,W],那就代表某个像素的平移,而不是相机的平移.
+5. 损失函数的另一个主要组成部分针对平移和旋转,主要原理基于这样一种事实:
+    假如Ps上的一个像素Is经过平移和旋转变换到t视角上的It,我们交换s和t,计算出反变换,It根据这个反变换应该能恰好回到Is的位置
+    如果这个过程出现了偏差,就说明我们的平移和旋转不够准确,应该使用损失函数惩罚这种现象.
+    这就叫"循环变换一致性损失",分为Rot_loss和Trans_loss
+6. 损失函数的最后一个部分是所谓的"平滑损失",对"背景平移场"和深度图施加.
+    其原理是基于这样一种先验:我们视野中应该由"一片一片"的联通区域构成,每"一片"区域都可能是来自于同一个物体,
+    根据生活经验,我们认为常见的物体应该具有连续平滑的景深,而且这个物体自己运动时应该是整体一起运动的,
+    这样的先验就意味着深度图和平移场里面不应该存在大量的离群点,而平滑损失正好能约束这一情况
+7. 上边的部分过程对于Ps和Pt是不对称的,因此需要交换二者的角色分别计算一次
+
 
 """
-"""
-训练现场:
-1. train函数每次处理的是一个epoch,在内部实际上的逐个batch进行反向传播的
-2. 对于每个batch,我们需要让depthnet前向传播SEQ_LENGTH次,让motion_net前向传播(SEQ_LENGTH-1)*2次
-假设SEQ_LENGTH=5,那么MotionNet需要这样计算: 12/21,23/32,34/43,45/54,共(SEQ_LENGTH-1)*2次
-        其中正序的一组存储在rotation_pred,translation_pred,residual_translation_pred,intrinsic_pred中
-        逆序的一组存储在inv_rotation_pred,inv_translation_pred,inv_residual_translation_pred,inv_intrinsic_pred中
-        这8个list的长度都是SEQ_LENGTH-1
-"""
+
 
 import torch
 import torch.nn as nn
 from evision_model import transform_depth_map
+import transform_utils
 
 LAYER_NORM_NOISE_RAMPUP_STEPS = 10000
 MIN_OBJECT_AREA = 20
@@ -277,43 +297,35 @@ def _smoothness_helper(motion_map):
 
 
 def rgbd_consistency_loss(frame1transformed_depth, frame1rgb, frame2depth, frame2rgb):
-    """Computes a loss that penalizes RGB and depth inconsistencies betwen frames.
+    """
+    计算损失，惩罚帧间的RGB和深度不一致。
+    此函数计算3种损失，惩罚两个帧之间的不一致：深度，RGB和结构相似性。
+    关于这两个帧，它不是对称的。
+    特别是要解决遮挡问题，它只会惩罚frame1比frame2更靠近相机的像素处的深度和RGB不一致。
+    因此，正确的使用模式是调用两次并交换两个帧的顺序。
 
-  This function computes 3 losses that penalize inconsistencies between two frames: depth, RGB, and structural similarity.
-  It IS NOT SYMMETRIC with respect to both frames.
-  In particular, to address occlusions,
-  it only penalizes depth and RGB inconsistencies at pixels where frame1 is closer to the camera than frame2.
-  (Why? see https://arxiv.org/abs/1904.04998).
-  Therefore the intended usage pattern is running it twice - second time with the two frames swapped.
+    Args:
+        frame1transformed_depth: 一个TransformedDepthMap 对象,内部数据相当于[B，H，W],表示将frame 1变换到frame 2之后的深度图，
+                                该变换考虑了发生在frame 1和frame 2之间的所有相机和对象运动。 。
+        frame1rgb:   张量[B, H, W, C]  RGB image at frame1.
+        frame2rgb:   张量[B, H, W, C]  RGB image at frame2.
+        frame2depth: 张量[B, H, W]     depth map at frame2.
 
-  Args:
-    frame1transformed_depth: A transform_depth_map.
-        TransformedDepthMap object representing the depth map of frame 1 after it was motion-transformed to frame 2,
-        a motion transform that accounts for all camera and object motion that occurred between frame1 and frame2.
-        The tensors inside frame1transformed_depth are of shape [B, H, W].
-    frame1rgb: A tf.Tensor of shape [B, H, W, C] containing the RGB image at frame1.
-    frame2depth: A tf.Tensor of shape [B, H, W] containing the depth map at frame2.
-    frame2rgb: A tf.Tensor of shape [B, H, W, C] containing the RGB image at frame2.
 
-  Returns:
-    A dicionary from string to tf.Tensor, with the following entries:
-      depth_error: A tf scalar, the depth mismatch error between the two frames.
-      rgb_error: A tf scalar, the rgb mismatch error between the two frames.
-      ssim_error: A tf scalar, the strictural similarity mismatch error between
-        the two frames.
-      depth_proximity_weight: A tf.Tensor of shape [B, H, W], representing a
-        function that peaks (at 1.0) for pixels where there is depth consistency
-        between the two frames, and is small otherwise.
-      frame1_closer_to_camera: A tf.Tensor of shape [B, H, W, 1], a mask that is
-        1.0 when the depth map of frame 1 has smaller depth than frame 2.
-  """
+    Returns:
+       张量dict:
+          depth_error: A tf scalar, the depth mismatch error between the two frames.
+          rgb_error: A tf scalar, the rgb mismatch error between the two frames.
+          ssim_error: A tf scalar, the strictural similarity mismatch error between the two frames.
+          depth_proximity_weight: 一个张量 [B, H, W], 两帧之间需要计算深度一致性的位置为1.0,其他位置较小
+          frame1_closer_to_camera: 一个张量 [B, H, W, 1], frame 1 的深度值比frame 2小的位置为1
+    """
     pixel_xy = frame1transformed_depth.pixel_xy
     frame2depth_resampled = _resample_depth(frame2depth, pixel_xy)
     frame2rgb_resampled = contrib_resampler.resampler.resampler(frame2rgb, pixel_xy)
 
-    # f1td.depth is the predicted depth at [pixel_y, pixel_x] for frame2. Now we
-    # generate (by interpolation) the actual depth values for frame2's depth, at
-    # the same locations, so that we can compare the two depths.
+    # f1td.depth 是frame2的预测深度at [pixel_y, pixel_x].
+    # 现在我们通过插值生成同样坐标网格下frame2的深度,以便进行比较
 
     # We penalize inconsistencies between the two frames' depth maps only if the
     # transformed depth map (of frame 1) falls closer to the camera than the
@@ -323,16 +335,10 @@ def rgbd_consistency_loss(frame1transformed_depth, frame1rgb, frame2depth, frame
     # the camera than frame2's? These will be handled when we swap the roles of
     # frame 1 and 2 (more in https://arxiv.org/abs/1904.04998).
     frame1_closer_to_camera = tf.to_float(
-        tf.logical_and(
-            frame1transformed_depth.mask,
-            tf.less(frame1transformed_depth.depth, frame2depth_resampled)))
-    depth_error = tf.reduce_mean(
-        tf.abs(frame2depth_resampled - frame1transformed_depth.depth) *
-        frame1_closer_to_camera)
-
-    rgb_error = (
-            tf.abs(frame2rgb_resampled - frame1rgb) * tf.expand_dims(
-        frame1_closer_to_camera, -1))
+        tf.logical_and(frame1transformed_depth.mask,
+                        tf.less(frame1transformed_depth.depth, frame2depth_resampled)))
+    depth_error = tf.reduce_mean(tf.abs(frame2depth_resampled - frame1transformed_depth.depth) * frame1_closer_to_camera)
+    rgb_error = (tf.abs(frame2rgb_resampled - frame1rgb) * tf.expand_dims(frame1_closer_to_camera, -1))
     rgb_error = tf.reduce_mean(rgb_error)
 
     # We generate a weight function that peaks (at 1.0) for pixels where when the
@@ -340,9 +346,9 @@ def rgbd_consistency_loss(frame1transformed_depth, frame1rgb, frame2depth, frame
     # fall off to zero otherwise. This function is used later for weighing the
     # structural similarity loss term. We only want to demand structural
     # similarity for surfaces that are close to one another in the two frames.
-    depth_error_second_moment = _weighted_average(
-        tf.square(frame2depth_resampled - frame1transformed_depth.depth),
-        frame1_closer_to_camera) + 1e-4
+    depth_error_second_moment = _weighted_average(tf.square(frame2depth_resampled - frame1transformed_depth.depth),
+                                                  frame1_closer_to_camera) \
+                                + 1e-4
     depth_proximity_weight = (
             depth_error_second_moment /
             (tf.square(frame2depth_resampled - frame1transformed_depth.depth) +
@@ -374,30 +380,23 @@ def rgbd_consistency_loss(frame1transformed_depth, frame1rgb, frame2depth, frame
 def motion_field_consistency_loss(frame1transformed_pixelxy, mask,
                                   rotation1, translation1,
                                   rotation2, translation2):
-    """Computes a cycle consistency loss between two motion maps.
+    """
+        计算两个运动图之间的循环一致性损失。
 
-  Given two rotation and translation maps (of two frames), and a mapping from
-  one frame to the other, this function assists in imposing that the fields at
-  frame 1 represent the opposite motion of the ones in frame 2.
 
-  In other words: At any given pixel on frame 1, if we apply the translation and
-  rotation designated at that pixel, we land on some pixel in frame 2, and if we
-  apply the translation and rotation designated there, we land back at the
-  original pixel at frame 1.
+    在第1帧的任何给定像素处，如果我们应用在该像素处指定的平移和旋转，
+    则变换到第2帧的某个像素处，然后在该像素上应用在该像素处指定的平移和旋转，我们将回到第1帧的原始像素那个位置.
 
   Args:
-    frame1transformed_pixelxy: A tf.Tensor of shape [B, H, W, 2] representing
-      the motion-transformed location of each pixel in frame 1. It is assumed
-      (but not verified) that frame1transformed_pixelxy was obtained by properly
-      applying rotation1 and translation1 on the depth map of frame 1.
-    mask: A tf.Tensor of shape [B, H, W, 2] expressing the weight of each pixel
-      in the calculation of the consistency loss.
-    rotation1: A tf.Tensor of shape [B, 3] representing rotation angles.
-    translation1: A tf.Tensor of shape [B, H, W, 3] representing translation
-      vectors.
-    rotation2: A tf.Tensor of shape [B, 3] representing rotation angles.
-    translation2: A tf.Tensor of shape [B, H, W, 3] representing translation
-      vectors.
+    frame1transformed_pixelxy: A tf.Tensor of shape [B, H, W, 2]
+    representing the motion-transformed location of each pixel in frame 1.
+    It is assumed (but not verified) that
+    frame1transformed_pixelxy was obtained by properlyapplying rotation1 and translation1 on the depth map of frame 1.
+    mask: 张量 [b，H，W，2] 表示一致性损失的计算中的每个像素的权重。
+    rotation1:  [B, 3] 旋转角 1->2
+    translation1: [B, H, W, 3] 平移向量场(由每个像素的平移向量构成),1->2
+    rotation2: [B, 3] 旋转角 2->1
+    translation2: [B, H, W, 3] 平移向量场(由每个像素的平移向量构成),2->1
 
   Returns:
     A dicionary from string to tf.Tensor, with the following entries:
@@ -405,12 +404,10 @@ def motion_field_consistency_loss(frame1transformed_pixelxy, mask,
       translation_error: A tf scalar, the translation consistency error.
   """
 
-    translation2resampled = contrib_resampler.resampler.resampler(
-        translation2, tf.stop_gradient(frame1transformed_pixelxy))
-    rotation1field = tf.broadcast_to(
-        _expand_dims_twice(rotation1, -2), tf.shape(translation1))
-    rotation2field = tf.broadcast_to(
-        _expand_dims_twice(rotation2, -2), tf.shape(translation2))
+    translation2resampled = \
+        contrib_resampler.resampler.resampler(translation2, tf.stop_gradient(frame1transformed_pixelxy))
+    rotation1field = tf.broadcast_to(_expand_dims_twice(rotation1, -2), translation1.shape)
+    rotation2field = tf.broadcast_to(_expand_dims_twice(rotation2, -2), translation2.shape)
     rotation1matrix = transform_utils.matrix_from_angles(rotation1field)
     rotation2matrix = transform_utils.matrix_from_angles(rotation2field)
 
@@ -450,8 +447,7 @@ def rgbd_and_motion_consistency_loss(frame1transformed_depth, frame1rgb,
                                      frame2depth, frame2rgb, rotation1,
                                      translation1, rotation2, translation2):
     """A helper that bundles rgbd and motion consistency losses together."""
-    endpoints = rgbd_consistency_loss(frame1transformed_depth, frame1rgb,
-                                      frame2depth, frame2rgb)
+    endpoints = rgbd_consistency_loss(frame1transformed_depth, frame1rgb, frame2depth, frame2rgb)
     # We calculate the loss only for when frame1transformed_depth is closer to the
     # camera than frame2 (occlusion-awareness). See explanation in
     # rgbd_consistency_loss above.
@@ -490,9 +486,8 @@ def weighted_ssim(x, y, weight, c1=0.01 ** 2, c2=0.03 ** 2, weight_epsilon=0.01)
     seriously.
   """
     if c1 == float('inf') and c2 == float('inf'):
-        raise ValueError('Both c1 and c2 are infinite, SSIM loss is zero. This is '
-                         'likely unintended.')
-    weight = tf.expand_dims(weight, -1)
+        raise ValueError('Both c1 and c2 are infinite, SSIM loss is zero. This is likely unintended.')
+    weight = torch.unsqueeze(weight, 1)
     average_pooled_weight = _avg_pool3x3(weight)
     weight_plus_epsilon = weight + weight_epsilon
     inverse_average_pooled_weight = 1.0 / (average_pooled_weight + weight_epsilon)
@@ -516,24 +511,27 @@ def weighted_ssim(x, y, weight, c1=0.01 ** 2, c2=0.03 ** 2, weight_epsilon=0.01)
         ssim_n = (2 * mu_x * mu_y + c1) * (2 * sigma_xy + c2)
         ssim_d = (mu_x ** 2 + mu_y ** 2 + c1) * (sigma_x + sigma_y + c2)
     result = ssim_n / ssim_d
-    return tf.clip_by_value((1 - result) / 2, 0, 1), average_pooled_weight
+    return torch.clamp((1 - result) / 2, 0, 1), average_pooled_weight
 
 
 def _avg_pool3x3(x):
-    return tf.nn.avg_pool(x, [1, 3, 3, 1], [1, 1, 1, 1], 'VALID')
+    # tf.nn.avg_pool(x, [1, 3, 3, 1], [1, 1, 1, 1], 'VALID')
+    return torch.nn.functional.avg_pool2d(x, kernel_size=3, stride=1, padding=0)
 
 
 def _weighted_average(x, w, epsilon=1.0):
-    weighted_sum = tf.reduce_sum(x * w, axis=(1, 2), keepdims=True)
-    sum_of_weights = tf.reduce_sum(w, axis=(1, 2), keepdims=True)
+    # weighted_sum = tf.reduce_sum(x * w, axis=(1, 2), keepdims=True)
+    weighted_sum = (x * w).sum(dim=(1, 2), keepdims=True)
+    # sum_of_weights = tf.reduce_sum(w, axis=(1, 2), keepdims=True)
+    sum_of_weights = w.sum(dim=(1, 2), keepdims=True)
     return weighted_sum / (sum_of_weights + epsilon)
 
 
 def _resample_depth(depth, coordinates):
-    depth = tf.expand_dims(depth, -1)
+    depth = torch.unsqueeze(depth, 1)
     result = contrib_resampler.resampler.resampler(depth, coordinates)
-    return tf.squeeze(result, axis=3)
+    return torch.squeeze(result, dim=1)
 
 
 def _expand_dims_twice(x, dim):
-    return tf.expand_dims(tf.expand_dims(x, dim), dim)
+    return torch.unsqueeze(torch.unsqueeze(x, dim), dim)
