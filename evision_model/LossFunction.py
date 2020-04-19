@@ -5,12 +5,12 @@ Loss Function for EvisionNet
 based on "Depth from video in the wild", "SfmLearner-PyTorch", "SfmLearner-TF" and "struct2depth"
 
 Total Loss = Depth Smoothing +          # [done] 1. image-aware 深度平滑损失
-             Motion Smoothing +         # 2. 运动平滑(需要seg_stack即object_mask)
-             Reconstr loss +            # 3. 惩罚
-             ssim loss +                # 4. structural similarity index,结构相似性损失
-             Depth Consistency loss +   # 5. 深度一致性损失
-             Rot_loss +                 # 6. 旋转损失
-             Trans_loss                 # 7. 平移损失
+             Motion Smoothing +         # 2. 背景平移场平滑损失
+             Reconstr loss +            # 3. RGB惩罚
+             ssim loss +                # 4. 结构相似性平衡惩罚
+             Depth Consistency loss +   # 5. 深度一致性损失,基于重投影
+             Rot_loss +                 # 6. 旋转损失,基于循环变换
+             Trans_loss                 # 7. 平移损失,基于循环变换
             (以上各项均带有权重系数超参数)
 code by jiafeng5513
 
@@ -24,7 +24,7 @@ inv_K代表K的逆矩阵.
                Ds          inv_r,inv_t         Dt
             Ds * Ps = K * R * Dt * inv_K * Pt +K * t
 1. 根据这个式子,我们可以从左边解出Ds,此时这个D's是合成的,我们可以把它跟DepthNet输出的Ds进行比较,这就是深度一致性损失
-   实际操作时,我们统计D's[i,j]<Ds[i,j]的位置,只有这些位置的深度值参与深度一致性损失,
+    实际操作时,我们统计D's[i,j]<Ds[i,j]的位置,只有这些位置的深度值参与深度一致性损失,
 2. 为了惩罚D's[i,j]全部大于Ds[i,j]的行为,对于所有D's[i,j]<Ds[i,j]的[i,j],累加|Ps[i,j]-Ps[i,j]|,并在RGB三个通道上做均值,
     这就是rgb_error
 3. 进一步的惩罚采用结构相似性.首先计算所有D's[i,j]<Ds[i,j]处深度差值的标准差,并以此计算权重函数,
