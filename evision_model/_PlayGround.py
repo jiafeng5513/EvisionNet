@@ -46,5 +46,7 @@ def reduce_any_demo():
 
 
 if __name__ == '__main__':
-    item_tensor()
+    #item_tensor()
+    grid = torch.stack(torch.meshgrid(torch.range(start=0,end=3), torch.range(start=0,end=4)))
+    print(grid)
     pass

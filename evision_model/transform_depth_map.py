@@ -73,30 +73,20 @@ class TransformedDepthMap(object):
 
 
 def using_motion_vector(depth, translation, rotation_angles, intrinsic_mat, distortion_coeff=None):
-    """Transforms a depth map using a motion vector, or a motion vector field.
-
-  This function receives a translation vector and rotation angles vector. They
-  can be the same for the entire image, or different for each pixel.
-
-  Args:
-    depth: A tf.Tensor of shape [B, H, W]
-    translation: A tf.Tensor of shape [B, 3] or [B, H, W, 3] representing a
-      translation vector for the entire image or for every pixel respectively.
-    rotation_angles: A tf.Tensor of shape [B, 3] or [B, H, W, 3] representing a
-      set of rotation angles for the entire image or for every pixel
-      respectively. We conform to the same convention as in inverse_warp above,
-      but may need to reconsider, depending on the conventions tf.graphics and
-      other users will converge to.
-    intrinsic_mat: A tf.Tensor of shape [B, 3, 3].
-    distortion_coeff: A scalar (python or tf.Tensor) of a floating point type,
-      or None, the quadratic radial distortion coefficient. If 0.0 or None, a
-      distortion-less implementation (which is simpler and maybe faster) will be
-      used.
-    name: A string or None, a name scope for the ops.
-
-  Returns:
-    A TransformedDepthMap object.
-  """
+    """
+    使用平移向量(或者平移向量场)对深度图进行变换?
+    translation 可以是一个向量:这意味着对于整张图的每一个像素采取相同的平移变换
+                也可以是一个向量"场":这意味着每一个像素具有自己的平移向量.
+                对于旋转角度也是一样
+    Args:
+        depth: [B, H, W] 深度图
+        translation: [B, 3] or [B, H, W, 3]
+        rotation_angles: [B, 3] or [B, H, W, 3]
+        intrinsic_mat:  [B, 3, 3].
+        distortion_coeff: 浮点数,二次径向畸变系数,如果为None,则不考虑畸变,速度会有所提升
+    Returns:
+        A TransformedDepthMap object.
+    """
     if distortion_coeff is not None and distortion_coeff != 0.0:
         pixel_x, pixel_y, z = _using_motion_vector_with_distortion(depth, translation, rotation_angles,
                                                                    intrinsic_mat, distortion_coeff)
@@ -117,7 +107,7 @@ def _using_motion_vector(depth, translation, rotation_angles, intrinsic_mat):
         translation = torch.unsqueeze(torch.unsqueeze(translation, -1), -1)
 
     _, height, width = depth.shape
-    grid = torch.stack(torch.meshgrid(torch.range(width), torch.range(height)))
+    grid = torch.stack(torch.meshgrid(torch.range(begin=0,end=width), torch.range(begin=0,end=height)))
     grid = grid.float()
     intrinsic_mat_inv = torch.inverse(intrinsic_mat)
 
@@ -130,7 +120,7 @@ def _using_motion_vector(depth, translation, rotation_angles, intrinsic_mat):
         # Howeverwe use einsum for better clarity. Under the hood, einsum performs
         # the reshaping and invocation of BatchMatMul, instead of doing it manually,
         # as in inverse_warp.
-        projected_rotation = torch.einsum('bij,bjk,bkl->bil', intrinsic_mat, rot_mat, intrinsic_mat_inv)
+        projected_rotation = torch.einsum('bij,bjk,bkl->bil', intrinsic_mat, rot_mat, intrinsic_mat_inv)  # K*R*inv_K
         pcoords = torch.einsum('bij,jhw,bhw->bihw', projected_rotation, grid, depth)
     elif len(rotation_angles.shape) == 4:
         # We push the H and W dimensions to the end, and transpose the rotation matrix elements (as noted above).
@@ -138,7 +128,7 @@ def _using_motion_vector(depth, translation, rotation_angles, intrinsic_mat):
         projected_rotation = torch.einsum('bij,bjkhw,bkl->bilhw', intrinsic_mat, rot_mat, intrinsic_mat_inv)
         pcoords = torch.einsum('bijhw,jhw,bhw->bihw', projected_rotation, grid, depth)
 
-    projected_translation = torch.einsum('bij,bhwj->bihw', intrinsic_mat, translation)
+    projected_translation = torch.einsum('bij,bhwj->bihw', intrinsic_mat, translation)  # Kt
     pcoords += projected_translation
     x, y, z = torch.unbind(pcoords, axis=1)
     return x / z, y / z, z
