@@ -99,7 +99,7 @@ class LossFactory(object):
         pass
 
     # public : 联合损失
-    def getTotalLoss(self, image_stack,  depth_pred,
+    def getTotalLoss(self, image_stack, depth_pred,
                      trans, trans_res, rot, inv_trans, inv_trans_res, inv_rot,
                      intrinsic_mat, seg_stack=None):
         """
@@ -151,18 +151,20 @@ class LossFactory(object):
                 self.__Depth_Consistency_Loss(transformed_depth_j, image_stack[i + 1], depth_pred[i], image_stack[i])
 
             _rot_loss_j, _trans_loss_j = self.__Cyclic_Consistency_Loss(transformed_depth_j.pixel_xy, mask_j, rot[i],
-                                                                    trans[i], inv_rot[i], inv_trans[i])
+                                                                        trans[i], inv_rot[i], inv_trans[i])
             # ---------------------[j-->i]-------------------------#
             transformed_depth_i = transform_depth_map.using_motion_vector(depth_pred[i], _inv_trans, inv_rot[i],
                                                                           intrinsic_mat)
 
             _depth_consistency_loss_i, _rgb_loss_i, _ssim_loss_i, mask_i = \
-                self.__Depth_Consistency_Loss(transformed_depth_j, image_stack[i], depth_pred[i+1], image_stack[i+1])
+                self.__Depth_Consistency_Loss(transformed_depth_j, image_stack[i], depth_pred[i + 1],
+                                              image_stack[i + 1])
 
-            _rot_loss_i, _trans_loss_i = self.__Cyclic_Consistency_Loss(transformed_depth_i.pixel_xy, mask_i, inv_rot[i],
-                                                                    inv_trans[i], rot[i], trans[i])
+            _rot_loss_i, _trans_loss_i = self.__Cyclic_Consistency_Loss(transformed_depth_i.pixel_xy, mask_i,
+                                                                        inv_rot[i],
+                                                                        inv_trans[i], rot[i], trans[i])
             # -----------------------累加--------------------------#
-            _depth_consistency_loss += (_depth_consistency_loss_j+_depth_consistency_loss_i)
+            _depth_consistency_loss += (_depth_consistency_loss_j + _depth_consistency_loss_i)
             _rgb_loss += (_rgb_loss_j + _rgb_loss_i)
             _ssim_loss += (_ssim_loss_j + _ssim_loss_i)
             _rot_loss += (_rot_loss_j + _rot_loss_i)
@@ -238,15 +240,12 @@ class LossFactory(object):
             关于这两个帧，它不是对称的。
             特别是要解决遮挡问题，它只会惩罚frame1比frame2更靠近相机的像素处的深度和RGB不一致。
             因此，正确的使用模式是调用两次并交换两个帧的顺序。
-
             Args:
                 frame1transformed_depth: 一个TransformedDepthMap 对象,内部数据相当于[B，H，W],表示将frame 1变换到frame 2之后的深度图，
                                         该变换考虑了发生在frame 1和frame 2之间的所有相机和对象运动。 。
-                frame1rgb:   张量[B, H, W, C]  RGB image at frame1.
-                frame2rgb:   张量[B, H, W, C]  RGB image at frame2.
+                frame1rgb:   张量[B, C, H, W]  RGB image at frame1.
+                frame2rgb:   张量[B, C, H, W]  RGB image at frame2.
                 frame2depth: 张量[B, H, W]     depth map at frame2.
-
-
             Returns:
                张量dict:
                   depth_error: A tf scalar, the depth mismatch error between the two frames.
@@ -256,17 +255,15 @@ class LossFactory(object):
                   frame1_closer_to_camera: 一个张量 [B, H, W, 1], frame 1 的深度值比frame 2小的位置为1
             """
         pixel_xy = frame1transformed_depth.pixel_xy
-        frame2depth_resampled = torch.squeeze(
-            contrib_resampler.resampler.resampler(torch.unsqueeze(frame2depth, 1), pixel_xy), dim=1)
-        frame2rgb_resampled = contrib_resampler.resampler.resampler(frame2rgb, pixel_xy)
+        frame2depth_resampled = torch.squeeze(resample(torch.unsqueeze(frame2depth, 1), pixel_xy), dim=1)
+        frame2rgb_resampled = resample(frame2rgb, pixel_xy)
 
-        frame1_closer_to_camera = tf.to_float(
-            tf.logical_and(frame1transformed_depth.mask,
-                           tf.less(frame1transformed_depth.depth, frame2depth_resampled)))
-        depth_error = tf.reduce_mean(
-            tf.abs(frame2depth_resampled - frame1transformed_depth.depth) * frame1_closer_to_camera)
-        rgb_error = (tf.abs(frame2rgb_resampled - frame1rgb) * tf.expand_dims(frame1_closer_to_camera, -1))
-        rgb_error = tf.reduce_mean(rgb_error)
+        frame1_closer_to_camera = frame1transformed_depth.mask.mul(torch.le(frame1transformed_depth.depth,
+                                                                            frame2depth_resampled)).float()
+        depth_error = (
+                    torch.abs(frame2depth_resampled - frame1transformed_depth.depth) * frame1_closer_to_camera).mean()
+        rgb_error = (torch.abs(frame2rgb_resampled - frame1rgb) * torch.unsqueeze(frame1_closer_to_camera, -1))
+        rgb_error = rgb_error.mean()
 
         def _weighted_average(x, w, epsilon=1.0):
             # weighted_sum = tf.reduce_sum(x * w, axis=(1, 2), keepdims=True)
@@ -275,26 +272,17 @@ class LossFactory(object):
             sum_of_weights = w.sum(dim=(1, 2), keepdims=True)
             return weighted_sum / (sum_of_weights + epsilon)
 
-        depth_error_second_moment = \
-            _weighted_average(tf.square(frame2depth_resampled - frame1transformed_depth.depth),
-                              frame1_closer_to_camera) + 1e-4
-
+        depth_error_second_moment = _weighted_average((frame2depth_resampled - frame1transformed_depth.depth).pow(2),
+                                                      frame1_closer_to_camera) + 1e-4
         depth_proximity_weight = (
-                depth_error_second_moment(tf.square(frame2depth_resampled - frame1transformed_depth.depth) +
-                                          depth_error_second_moment) * tf.to_float(frame1transformed_depth.mask))
-
-        # If we don't stop the gradient training won't start. The reason is presumably
-        # that then the network can push the depths apart instead of seeking RGB
-        # consistency.
-        depth_proximity_weight = tf.stop_gradient(depth_proximity_weight)
-
-        ssim_error, avg_weight = self.__weighted_ssim(
-            frame2rgb_resampled,
-            frame1rgb,
-            depth_proximity_weight,
-            c1=float('inf'),  # These values of c1 and c2 work better than defaults.
-            c2=9e-6)
-        ssim_error = tf.reduce_mean(ssim_error * avg_weight)
+                depth_error_second_moment((frame2depth_resampled - frame1transformed_depth.depth).pow(2) +
+                                          depth_error_second_moment) * frame1transformed_depth.mask.float())
+        ssim_error, avg_weight = self.__weighted_ssim(frame2rgb_resampled,
+                                                      frame1rgb,
+                                                      depth_proximity_weight,  # stop_gradient
+                                                      c1=float('inf'),  # this c1 and c2 work better than defaults.
+                                                      c2=9e-6)
+        ssim_error = (ssim_error * avg_weight).mean()
         return depth_error, rgb_error, ssim_error, frame1_closer_to_camera
 
     # private : 6.7.循环变换一致性损失
@@ -302,8 +290,6 @@ class LossFactory(object):
                                   translation2):
         """
                计算两个运动图之间的循环一致性损失。
-
-
            在第1帧的任何给定像素处，如果我们应用在该像素处指定的平移和旋转，
            则变换到第2帧的某个像素处，然后在该像素上应用在该像素处指定的平移和旋转，我们将回到第1帧的原始像素那个位置.
 
@@ -324,20 +310,20 @@ class LossFactory(object):
              translation_error: A tf scalar, the translation consistency error.
          """
 
-        translation2resampled = \
-            contrib_resampler.resampler.resampler(translation2, tf.stop_gradient(frame1transformed_depth_pixelxy))
+        translation2resampled = resample(translation2, frame1transformed_depth_pixelxy)  # stop_gradient
 
         def _expand_dims_twice(x, dim):
             return torch.unsqueeze(torch.unsqueeze(x, dim), dim)
-        rotation1field = tf.broadcast_to(_expand_dims_twice(rotation1, -2), translation1.shape)
-        rotation2field = tf.broadcast_to(_expand_dims_twice(rotation2, -2), translation2.shape)
+
+        rotation1field, _ = torch.broadcast_tensors(_expand_dims_twice(rotation1, -2), translation1)
+        rotation2field, _ = torch.broadcast_tensors(_expand_dims_twice(rotation2, -2), translation2)
         rotation1matrix = transform_utils.matrix_from_angles(rotation1field)
         rotation2matrix = transform_utils.matrix_from_angles(rotation2field)
 
-        rot_unit, trans_zero = transform_utils.combine(
-            rotation2matrix, translation2resampled,
-            rotation1matrix, translation1)
-        eye = tf.eye(3, batch_shape=tf.shape(rot_unit)[:-2])
+        rot_unit, trans_zero = transform_utils.combine(rotation2matrix, translation2resampled,
+                                                       rotation1matrix, translation1)
+
+        eye = torch.eye(3).unsqueeze(0).repeat(rot_unit.shape[0], 1, 1)
 
         transform_utils.matrix_from_angles(rotation1field)  # Delete this later
         transform_utils.matrix_from_angles(rotation2field)  # Delete this later
@@ -346,17 +332,17 @@ class LossFactory(object):
         # the loss agnostic of their magnitudes, only wanting them to be opposite in
         # directions. Otherwise the loss has a tendency to drive the rotations to
         # zero.
-        rot_error = tf.reduce_mean(tf.square(rot_unit - eye), axis=(3, 4))
-        rot1_scale = tf.reduce_mean(tf.square(rotation1matrix - eye), axis=(3, 4))
-        rot2_scale = tf.reduce_mean(tf.square(rotation2matrix - eye), axis=(3, 4))
+        rot_error = torch.mean((rot_unit - eye).pow(2), dim=(2, 4))
+        rot1_scale = torch.mean((rotation1matrix - eye).pow(2), dim=(3, 4))
+        rot2_scale = torch.mean((rotation2matrix - eye).pow(2), dim=(3, 4))
         rot_error /= (1e-24 + rot1_scale + rot2_scale)
-        rotation_error = tf.reduce_mean(rot_error)
+        rotation_error = rot_error.mean()
 
         def norm(x):
-            return tf.reduce_sum(tf.square(x), axis=-1)
+            return x.pow(2).sum(-1)
 
         # Here again, we normalize by the magnitudes, for the same reason.
-        translation_error = tf.reduce_mean(mask * norm(trans_zero) / (1e-24 + norm(translation1) + norm(translation2)))
+        translation_error = (mask * norm(trans_zero) / (1e-24 + norm(translation1) + norm(translation2))).mean()
 
         return rotation_error, translation_error
 
@@ -431,4 +417,24 @@ def dilate(x, foreground_dilation):
     return pool2d(x)
 
 
+def resample(int_map=None, xy_float=None):
+    """
+        int_map上的像素处于整数网格坐标下,xy_float描述了一个浮点数网格
+        该函数的作用就是把int_map在xy_float下进行重新采样
+    Args:
+        int_map      :   输入张量, [B,C,H_in,W_in],C可能是1或者3
+        xy_float     :   浮点数网格坐标,[B,H_out,W_out,2],需要注意,这是坐标网格,不遵守[b.c.h.w]
+    Returns:
+        调整后的数据  :   [B,C,H_out,W_out]
+    """
+    b_1, c_1, H_in, W_in = int_map.shape
+    b_2, H_out, W_out, c_2 = xy_float.shape
 
+    # 把坐标归一化到[-1,1],数据类型保持在float
+    x_float, y_float = torch.unbind(xy_float, dim=3)  # 把x和y 拆看,分别广播操作
+    x_float = torch.unsqueeze((2 * x_float / (W_in - 1)) - 1, dim=-1)  # new_x = 2*x/(w-1)-1
+    y_float = torch.unsqueeze((2 * y_float / (H_in - 1)) - 1, dim=-1)  # new_y = 2*y/(h-1)-1
+    grid = torch.cat((x_float, y_float), dim=-1).float()
+    output = torch.nn.functional.grid_sample(int_map.float(), grid,
+                                             mode='bilinear', padding_mode='zeros', align_corners=None)
+    return output
