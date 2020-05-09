@@ -129,8 +129,8 @@ def main():
     if args.epoch_size == 0:
         args.epoch_size = len(train_loader)
 
-    # create model
-    print("=> creating model")
+    # create models
+    print("=> creating models")
 
     disp_net = models.DispNetS().to(device)
     output_exp = args.mask_loss_weight > 0
@@ -200,7 +200,7 @@ def main():
         for error, name in zip(errors, error_names):
             tb_writer.add_scalar(name, error, epoch)
 
-        # Up to you to chose the most relevant error to measure your model's performance,
+        # Up to you to chose the most relevant error to measure your models's performance,
         # careful some measures are to maximize (such as a1,a2,a3)
         decisive_error = errors[1]
         if best_error < 0:

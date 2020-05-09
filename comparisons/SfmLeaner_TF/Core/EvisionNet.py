@@ -563,7 +563,7 @@ class EvisionNet(object):
         return results
 
     def save(self, sess, checkpoint_dir, step):
-        model_name = 'model'
+        model_name = 'models'
         print(" [*] Saving checkpoint to %s..." % checkpoint_dir)
         if step == 'latest':
             self.saver.save(sess, 

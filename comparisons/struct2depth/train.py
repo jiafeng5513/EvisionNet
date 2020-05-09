@@ -14,7 +14,7 @@
 # limitations under the License.
 # ==============================================================================
 
-"""Train the model. Please refer to README for example usage."""
+"""Train the models. Please refer to README for example usage."""
 
 from __future__ import absolute_import
 from __future__ import division
@@ -80,7 +80,7 @@ flags.DEFINE_string('pretrained_ckpt', None, 'Path to checkpoint with '
 flags.DEFINE_string('imagenet_ckpt', None, 'Initialize the weights according '
                     'to an ImageNet-pretrained checkpoint. Requires '
                     'architecture to be ResNet-18.')
-flags.DEFINE_string('checkpoint_dir', None, 'Directory to save model '
+flags.DEFINE_string('checkpoint_dir', None, 'Directory to save models '
                     'checkpoints.')
 flags.DEFINE_integer('train_steps', 10000000, 'Number of training steps.')
 flags.DEFINE_integer('summary_freq', 100, 'Save summaries every N steps.')
@@ -123,7 +123,7 @@ def main(_):
     raise ValueError('Using a joint encoder is currently not supported when '
                      'modeling object motion.')
   if FLAGS.handle_motion and FLAGS.seq_length != 3:
-    raise ValueError('The current motion model implementation only supports '
+    raise ValueError('The current motion models implementation only supports '
                      'using a sequence length of three.')
   if FLAGS.handle_motion and not FLAGS.compute_minimum_loss:
     raise ValueError('Computing the minimum photometric loss is required when '
@@ -132,14 +132,14 @@ def main(_):
     raise ValueError('To enforce object size constraints, enable motion '
                      'handling.')
   if FLAGS.imagenet_ckpt and not FLAGS.imagenet_norm:
-    logging.warn('When initializing with an ImageNet-pretrained model, it is '
+    logging.warn('When initializing with an ImageNet-pretrained models, it is '
                  'recommended to normalize the image inputs accordingly using '
                  'imagenet_norm.')
   if FLAGS.compute_minimum_loss and FLAGS.seq_length % 2 != 1:
     raise ValueError('Compute minimum loss requires using an odd number of '
                      'images in a sequence.')
   if FLAGS.architecture != nets.RESNET and FLAGS.imagenet_ckpt:
-    raise ValueError('Can only load weights from pre-trained ImageNet model '
+    raise ValueError('Can only load weights from pre-trained ImageNet models '
                      'when using ResNet-architecture.')
   if FLAGS.compute_minimum_loss and FLAGS.exhaustive_mode:
     raise ValueError('Exhaustive mode has no effect when compute_minimum_loss '
@@ -189,7 +189,7 @@ def main(_):
 
 def train(train_model, pretrained_ckpt, imagenet_ckpt, checkpoint_dir,
           train_steps, summary_freq):
-  """Train model."""
+  """Train models."""
   vars_to_restore = None
   if pretrained_ckpt is not None:
     vars_to_restore = util.get_vars_to_save_and_restore(pretrained_ckpt)
@@ -247,7 +247,7 @@ def train(train_model, pretrained_ckpt, imagenet_ckpt, checkpoint_dir,
 
       if step % steps_per_epoch == 0:
         logging.info('[*] Saving checkpoint to %s...', checkpoint_dir)
-        saver.save(sess, os.path.join(checkpoint_dir, 'model'),
+        saver.save(sess, os.path.join(checkpoint_dir, 'models'),
                    global_step=global_step)
 
       # Setting step to global_step allows for training for a total of

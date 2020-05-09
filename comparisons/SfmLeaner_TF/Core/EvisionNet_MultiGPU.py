@@ -571,11 +571,11 @@ def train():
                 if (step != 0) and (step % num_step_in_an_epoch == 0):  # an epoch is done
                     print(" [*] %3dth epoch done! Saving latest checkpoint to %s..." % (
                     current_epoch, FLAGS.checkpoint_dir))
-                    saver.save(sess, os.path.join(FLAGS.checkpoint_dir, 'model'), global_step=step)
+                    saver.save(sess, os.path.join(FLAGS.checkpoint_dir, 'models'), global_step=step)
 
                 if step * FLAGS.num_gpus >= FLAGS.num_epochs * num_of_batch_in_an_epoch:
                     print('Done training for %d epochs, %d steps.' % (FLAGS.num_epochs, step))
-                    saver.save(sess, os.path.join(FLAGS.checkpoint_dir, 'model.latest'))
+                    saver.save(sess, os.path.join(FLAGS.checkpoint_dir, 'models.latest'))
                     coord.request_stop()
                 step += 1
                 #

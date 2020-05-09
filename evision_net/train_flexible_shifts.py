@@ -92,8 +92,8 @@ def main():
         args.epoch_size = len(train_loader)
 
     train.args = args
-    # create model
-    print("=> creating model")
+    # create models
+    print("=> creating models")
 
     disp_net = models.DispNetS().cuda()
     output_exp = args.mask_loss_weight > 0
@@ -167,7 +167,7 @@ def main():
         for error, name in zip(errors, error_names):
             training_writer.add_scalar(name, error, epoch)
 
-        # Up to you to chose the most relevant error to measure your model's performance, careful some measures are to maximize (such as a1,a2,a3)
+        # Up to you to chose the most relevant error to measure your models's performance, careful some measures are to maximize (such as a1,a2,a3)
         decisive_error = errors[0]
         if best_error < 0:
             best_error = decisive_error

@@ -295,7 +295,7 @@ def encoder_resnet(target_image, weight_reg, is_training):
   Args:
     target_image: Input tensor with shape [B, h, w, 3] to encode.
     weight_reg: Parameter ignored.
-    is_training: Whether the model is being trained or not.
+    is_training: Whether the models is being trained or not.
 
   Returns:
     Tuple of tensors, with the first being the bottleneck layer as tensor of

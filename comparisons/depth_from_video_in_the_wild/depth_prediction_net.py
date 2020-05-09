@@ -38,7 +38,7 @@ def encoder_resnet(target_image, weight_reg, is_training, normalizer_fn=None):
   Args:
     target_image: Input tensor with shape [B, h, w, 3] to encode.
     weight_reg: Parameter ignored.
-    is_training: Whether the model is being trained or not.
+    is_training: Whether the models is being trained or not.
     normalizer_fn: Normalization function, defaults to batch normalization (_bn)
       below.
 

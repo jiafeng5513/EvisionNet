@@ -63,7 +63,7 @@ def associate(first_list, second_list,offset,max_difference):
     Input:
     first_list -- first dictionary of (stamp,data) tuples
     second_list -- second dictionary of (stamp,data) tuples
-    offset -- time offset between both dictionaries (e.g., to model the delay between the sensors)
+    offset -- time offset between both dictionaries (e.g., to models the delay between the sensors)
     max_difference -- search radius for candidate generation
 
     Output:

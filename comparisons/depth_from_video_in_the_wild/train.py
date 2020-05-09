@@ -30,7 +30,7 @@ from absl import logging
 import numpy as np
 import tensorflow.compat.v1 as tf
 
-# from depth_from_video_in_the_wild import model
+# from depth_from_video_in_the_wild import models
 import model
 
 gfile = tf.gfile
@@ -50,7 +50,7 @@ flags.DEFINE_integer('queue_size', 2000, 'Items in queue. Use smaller number for
 flags.DEFINE_integer('seed', 8964, 'Seed for random number generators.')
 flags.DEFINE_float('weight_reg', 1e-2, 'The amount of weight regularization to apply. '
                                        'This has no effect on the ResNet-based encoder architecture.')
-flags.DEFINE_string('checkpoint_dir', None, 'Directory to save model checkpoints.')
+flags.DEFINE_string('checkpoint_dir', None, 'Directory to save models checkpoints.')
 flags.DEFINE_integer('train_steps', int(1e6), 'Number of training steps.')
 flags.DEFINE_integer('summary_freq', 100, 'Save summaries every N steps.')
 flags.DEFINE_bool('debug', False, 'If true, one training step is performed and the results are dumped to a folder for debugging.')
@@ -184,7 +184,7 @@ def _train(train_model, checkpoint_dir, train_steps, summary_freq):
             # single image for sanity check
             if steps_per_epoch == 0 or step % steps_per_epoch == 0:
                 logging.info('[*] Saving checkpoint to %s...', checkpoint_dir)
-                saver.save(sess, os.path.join(checkpoint_dir, 'model'),
+                saver.save(sess, os.path.join(checkpoint_dir, 'models'),
                            global_step=global_step)
 
             # Setting step to global_step allows for training for a total of

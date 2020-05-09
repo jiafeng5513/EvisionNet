@@ -21,7 +21,7 @@
 # python inference.py \
 #    --input_dir ~/struct2depth/kitti-raw-uncompressed/ \
 #    --output_dir ~/struct2depth/output \
-#    --model_ckpt ~/struct2depth/model/model-199160
+#    --model_ckpt ~/struct2depth/models/models-199160
 #    --file_extension png \
 #    --depth \
 #    --egomotion true \
@@ -115,7 +115,7 @@ flags.DEFINE_enum('inference_crop', INFERENCE_CROP_NONE,
 flags.DEFINE_bool('use_masks', False, 'Whether to mask out potentially '
                   'moving objects when feeding image input to the egomotion '
                   'network. This might improve odometry results when using '
-                  'a motion model. For this, pre-computed segmentation '
+                  'a motion models. For this, pre-computed segmentation '
                   'masks have to be available for every image, with the '
                   'background being zero.')
 

@@ -153,7 +153,7 @@ def main(_):
     raise ValueError('Using a joint encoder is currently not supported when '
                      'modeling object motion.')
   if FLAGS.handle_motion and FLAGS.seq_length != 3:
-    raise ValueError('The current motion model implementation only supports '
+    raise ValueError('The current motion models implementation only supports '
                      'using a sequence length of three.')
   if FLAGS.handle_motion and not FLAGS.compute_minimum_loss:
     raise ValueError('Computing the minimum photometric loss is required when '
@@ -301,7 +301,7 @@ def main(_):
 
 
 def finetune_inference(train_model, model_ckpt, output_dir):
-  """Train model."""
+  """Train models."""
   vars_to_restore = None
   if model_ckpt is not None:
     vars_to_restore = util.get_vars_to_save_and_restore(model_ckpt)

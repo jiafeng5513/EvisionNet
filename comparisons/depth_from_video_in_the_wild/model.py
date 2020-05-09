@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""A model for learning depth, egomotion and object 3D-motion field.
+"""A models for learning depth, egomotion and object 3D-motion field.
 
 The method is described in https://arxiv.org/abs/1904.04998
 """
@@ -45,7 +45,7 @@ DEPTH_SCOPE = 'depth_prediction'
 
 
 class Model(object):
-    """A model for running training and inference.
+    """A models for running training and inference.
 
   Based on the Struct2Depth code:
   https://github.com/tensorflow/models/blob/master/research/struct2depth/model.py
@@ -321,7 +321,7 @@ class Model(object):
                 tf.summary.image('disparity%d' % i, self.disp[i])
 
     def _build_depth_test_graph(self):
-        """Builds depth model reading from placeholders."""
+        """Builds depth models reading from placeholders."""
         with tf.variable_scope(DEPTH_SCOPE, reuse=tf.AUTO_REUSE):
             input_image = tf.placeholder(
                 tf.float32, [self.batch_size, self.img_height, self.img_width, 3],

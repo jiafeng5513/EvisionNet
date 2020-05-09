@@ -356,7 +356,7 @@ def find_latest_ckpt(ckpt_path):
     for file in os.listdir(ckpt_path):
         if os.path.splitext(file)[1] == '.meta':
             prefix = os.path.splitext(file)[0]
-            if prefix == 'model.latest':
+            if prefix == 'models.latest':
                 return prefix
                 pass
             else:

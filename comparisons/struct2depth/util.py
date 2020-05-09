@@ -133,7 +133,7 @@ def is_a_numpy_array(obj):
 
 
 def count_parameters(also_print=True):
-  """Cound the number of parameters in the model.
+  """Cound the number of parameters in the models.
 
   Args:
     also_print: Boolean.  If True also print the numbers.
@@ -206,7 +206,7 @@ def get_vars_to_save_and_restore(ckpt=None):
       logging.warn('The following variables in the checkpoint were not loaded:')
       for varname_not_loaded in not_loaded:
         logging.info('%s', varname_not_loaded)
-  else:  # just get model vars.
+  else:  # just get models vars.
     for v in model_vars:
       mapping[v.op.name] = v
   return mapping

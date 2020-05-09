@@ -14,7 +14,7 @@
 # limitations under the License.
 # ==============================================================================
 
-"""Build model for inference or training."""
+"""Build models for inference or training."""
 
 from __future__ import absolute_import
 from __future__ import division
@@ -162,7 +162,7 @@ class Model(object):
       if self.handle_motion:
         self.build_objectmotion_test_graph()
 
-    # At this point, the model is ready. Print some info on model params.
+    # At this point, the models is ready. Print some info on models params.
     util.count_parameters()
 
   def build_train_graph(self):
@@ -226,7 +226,7 @@ class Model(object):
         base_input = self.image_stack_norm  # (B, H, W, 9)
         seg_input = self.seg_stack  # (B, H, W, 9)
         ref_zero = tf.constant(0, dtype=tf.uint8)
-        # Motion model is currently defined for three-frame sequences.
+        # Motion models is currently defined for three-frame sequences.
         object_mask1 = tf.equal(seg_input[:, :, :, 0], ref_zero)
         object_mask2 = tf.equal(seg_input[:, :, :, 3], ref_zero)
         object_mask3 = tf.equal(seg_input[:, :, :, 6], ref_zero)
@@ -398,7 +398,7 @@ class Model(object):
             self.inputs_objectmotion_net[s][i] = color_stack
             tf.get_variable_scope().reuse_variables()
     else:
-      # Don't handle motion, classic model formulation.
+      # Don't handle motion, classic models formulation.
       with tf.name_scope('egomotion_prediction'):
         if self.joint_encoder:
           # Re-arrange disp_bottleneck_stack to be of shape
@@ -563,7 +563,7 @@ class Model(object):
               self.warped_image[s][key] = tf.concat(self.all_batches, axis=0)
 
             else:
-              # Don't handle motion, classic model formulation.
+              # Don't handle motion, classic models formulation.
               egomotion_mat_i_j = project.get_transform_mat(
                   self.egomotion, i, j)
               # Inverse warp the source image to the target image frame for
@@ -756,7 +756,7 @@ class Model(object):
           tf.summary.histogram('scale%d_icp_rz%s' % (s, key), transform[:, 5])
 
   def build_depth_test_graph(self):
-    """Builds depth model reading from placeholders."""
+    """Builds depth models reading from placeholders."""
     with tf.variable_scope('depth_prediction'):
       input_image = tf.placeholder(
           tf.float32, [self.batch_size, self.img_height, self.img_width, 3],
@@ -773,7 +773,7 @@ class Model(object):
     self.est_depth = est_depth
 
   def build_egomotion_test_graph(self):
-    """Builds egomotion model reading from placeholders."""
+    """Builds egomotion models reading from placeholders."""
     input_image_stack = tf.placeholder(
         tf.float32,
         [1, self.img_height, self.img_width, self.seq_length * 3],
@@ -813,7 +813,7 @@ class Model(object):
     self.est_egomotion = est_egomotion
 
   def build_objectmotion_test_graph(self):
-    """Builds egomotion model reading from placeholders."""
+    """Builds egomotion models reading from placeholders."""
     input_image_stack_om = tf.placeholder(
         tf.float32,
         [1, self.img_height, self.img_width, self.seq_length * 3],
