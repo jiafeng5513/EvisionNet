@@ -92,7 +92,7 @@ def read_file_data(files, data_root):
         file_root = '{}/{}'
         
         im = filename
-        vel = '{}/{}/velodyne_points/data/{}.bin'.format(splits[0], splits[1], im_id)
+        vel = '{}/{}/velodyne_points/DataFlow/{}.bin'.format(splits[0], splits[1], im_id)
 
         if os.path.isfile(data_root + im):
             gt_files.append(data_root + vel)
@@ -137,11 +137,11 @@ def read_calib_file(path):
             if float_chars.issuperset(value):
                 # try to cast to float array
                 try:
-                    #data[key] = np.array(map(float, value.split(' ')))
+                    #DataFlow[key] = np.array(map(float, value.split(' ')))
                     #fix by jiafeng5513 follow by https://github.com/tinghuiz/SfMLearner/issues/55
                     data[key] = np.array([float(v) for v in value.split(' ')])
                 except ValueError:
-                    # casting error: data[key] already eq. value, so pass
+                    # casting error: DataFlow[key] already eq. value, so pass
                     pass
 
     return data
@@ -184,7 +184,7 @@ def generate_depth_map(calib_dir, velo_file_name, im_shape, cam=2, interp=False,
     P_velo2im = np.dot(np.dot(P_rect, R_cam2rect), velo2cam)
 
     # load velodyne points and remove all behind image plane (approximation)
-    # each row of the velodyne data is forward, left, up, reflectance
+    # each row of the velodyne DataFlow is forward, left, up, reflectance
     velo = load_velodyne_points(velo_file_name)
     velo = velo[velo[:, 0] >= 0, :]
 

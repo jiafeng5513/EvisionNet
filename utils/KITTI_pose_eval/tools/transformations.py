@@ -115,7 +115,7 @@ References
      Ronald Goldman. In "Graphics Gems II", pp 320-323. Morgan Kaufmann, 1991.
 (3)  Decomposing a matrix into simple transformations. Spencer Thomas.
      In "Graphics Gems II", pp 320-323. Morgan Kaufmann, 1991.
-(4)  Recovering the data from the transformation matrix. Ronald Goldman.
+(4)  Recovering the DataFlow from the transformation matrix. Ronald Goldman.
      In "Graphics Gems II", pp 324-331. Morgan Kaufmann, 1991.
 (5)  Euler angle conversion. Ken Shoemake.
      In "Graphics Gems IV", pp 222-229. Morgan Kaufmann, 1994.

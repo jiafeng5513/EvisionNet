@@ -14,7 +14,7 @@ def save_path_formatter(args, parser):
         return value == parser.get_default(key)
 
     args_dict = vars(args)
-    data_folder_name = str(Path(args_dict['data']).normpath().name)
+    data_folder_name = str(Path(args_dict['DataFlow']).normpath().name)
     folder_string = [data_folder_name]
     if not is_default('epochs', args_dict['epochs']):
         folder_string.append('{}epochs'.format(args_dict['epochs']))

@@ -68,7 +68,7 @@ flags.DEFINE_string('triplet_list_file_remains', None, 'Optional text file '
                     'the unrefined prediction from/to.')
 flags.DEFINE_string('model_ckpt', None, 'Model checkpoint to optimize.')
 flags.DEFINE_string('ft_name', '', 'Optional prefix for temporary files.')
-flags.DEFINE_string('file_extension', 'png', 'Image data file extension.')
+flags.DEFINE_string('file_extension', 'png', 'Image DataFlow file extension.')
 flags.DEFINE_float('learning_rate', 0.0001, 'Adam learning rate.')
 flags.DEFINE_float('beta1', 0.9, 'Adam momentum.')
 flags.DEFINE_float('reconstr_weight', 0.85, 'Frame reconstruction loss weight.')

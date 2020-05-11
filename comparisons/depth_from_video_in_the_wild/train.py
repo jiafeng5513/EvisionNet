@@ -36,8 +36,8 @@ import model
 gfile = tf.gfile
 MAX_TO_KEEP = 1000000  # Maximum number of checkpoints to keep.
 
-flags.DEFINE_string('data_dir', None, 'Preprocessed data.')
-flags.DEFINE_string('file_extension', 'png', 'Image data file extension.')
+flags.DEFINE_string('data_dir', None, 'Preprocessed DataFlow.')
+flags.DEFINE_string('file_extension', 'png', 'Image DataFlow file extension.')
 flags.DEFINE_float('learning_rate', 1e-4, 'Adam learning rate.')
 flags.DEFINE_float('reconstr_weight', 0.85, 'Frame reconstruction loss weight.')
 flags.DEFINE_float('ssim_weight', 3.0, 'SSIM loss weight.')

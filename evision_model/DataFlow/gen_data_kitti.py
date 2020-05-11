@@ -14,7 +14,7 @@
 # limitations under the License.
 # ==============================================================================
 
-""" Offline data generation for the KITTI dataset."""
+""" Offline DataFlow generation for the KITTI dataset."""
 
 import os
 from absl import app
@@ -97,13 +97,13 @@ for d in glob.glob(INPUT_DIR + '/*/'):
     for d2 in glob.glob(d + '*/'):
         seqname = d2.split('/')[-2]
         print('Processing sequence', seqname)
-        for subfolder in ['image_02/data', 'image_03/data']:
+        for subfolder in ['image_02/DataFlow', 'image_03/DataFlow']:
             ct = 1
-            seqname = d2.split('/')[-2] + subfolder.replace('image', '').replace('/data', '')
+            seqname = d2.split('/')[-2] + subfolder.replace('image', '').replace('/DataFlow', '')
             if not os.path.exists(OUTPUT_DIR + seqname):
                 os.mkdir(OUTPUT_DIR + seqname)
 
-            calib_camera = calib_raw[0] if subfolder=='image_02/data' else calib_raw[1]
+            calib_camera = calib_raw[0] if subfolder=='image_02/DataFlow' else calib_raw[1]
             folder = d2 + subfolder
             files = glob.glob(folder + '/*.png')
             files = [file for file in files if not 'disp' in file and not 'flip' in file and not 'seg' in file]

@@ -202,7 +202,7 @@ def adjust_shifts(args, train_set, adjust_loader, pose_exp_net, epoch, logger, t
     end = time.time()
 
     for i, (indices, tgt_img, ref_imgs, intrinsics, intrinsics_inv) in enumerate(adjust_loader):
-        # measure data loading time
+        # measure DataFlow loading time
         data_time.update(time.time() - end)
         tgt_img = tgt_img.to(device)
         ref_imgs = [img.to(device) for img in ref_imgs]

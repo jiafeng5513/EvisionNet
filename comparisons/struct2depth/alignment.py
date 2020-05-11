@@ -14,7 +14,7 @@
 # limitations under the License.
 # ==============================================================================
 
-"""Common utilities for data pre-processing, e.g. matching moving object across frames."""
+"""Common utilities for DataFlow pre-processing, e.g. matching moving object across frames."""
 
 import numpy as np
 

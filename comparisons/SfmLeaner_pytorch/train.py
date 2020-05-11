@@ -16,7 +16,7 @@ from tqdm import tqdm
 parser = argparse.ArgumentParser(description='EvisionNet', formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 
 """Program Initialization parameters"""
-parser.add_argument('data', metavar='/home/RAID1/DataSet/KITTI/KittiRaw_formatted/', help='预处理后的数据集路径')
+parser.add_argument('DataFlow', metavar='/home/RAID1/DataSet/KITTI/KittiRaw_formatted/', help='预处理后的数据集路径')
 parser.add_argument('--dataset-format', default='sequential', metavar='STR', help='数据格式, stacked:连帧;sequential:单帧序列')
 parser.add_argument('-j', '--workers', default=4, type=int, metavar='N', help='数据加载线程数')
 parser.add_argument('--pretrained-disp', dest='pretrained_disp', default=None, metavar='PATH', help='预训练Disp-Net的路径')
@@ -240,13 +240,13 @@ def train(args, train_loader, disp_net, pose_exp_net, optimizer, epoch_size, tb_
     train_pbar = tqdm(total=min(len(train_loader), args.epoch_size),
                       bar_format='{desc} {percentage:3.0f}%|{bar}| {postfix}')
     train_pbar.set_description('Train: Total Loss=#.####(#.####)')
-    train_pbar.set_postfix_str('<TIME: op=#.###(#.###) data=#.###(#.###)>')
+    train_pbar.set_postfix_str('<TIME: op=#.###(#.###) DataFlow=#.###(#.###)>')
 
     for i, (tgt_img, ref_imgs, intrinsics, intrinsics_inv) in enumerate(train_loader):
         log_losses = i > 0 and n_iter % args.print_freq == 0
         log_output = args.training_output_freq > 0 and n_iter % args.training_output_freq == 0
 
-        # measure data loading time
+        # measure DataFlow loading time
         data_time.update(time.time() - end)
         tgt_img = tgt_img.to(device)
         ref_imgs = [img.to(device) for img in ref_imgs]
@@ -300,7 +300,7 @@ def train(args, train_loader, disp_net, pose_exp_net, optimizer, epoch_size, tb_
         train_pbar.clear()
         train_pbar.update(1)
         train_pbar.set_description('Train: Total Loss={}'.format(losses))
-        train_pbar.set_postfix_str('<TIME: op={} data={}>'.format(batch_time, data_time))
+        train_pbar.set_postfix_str('<TIME: op={} DataFlow={}>'.format(batch_time, data_time))
         if i >= epoch_size - 1:
             break
 

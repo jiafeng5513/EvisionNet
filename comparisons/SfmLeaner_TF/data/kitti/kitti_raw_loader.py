@@ -49,7 +49,7 @@ class kitti_raw_loader(object):
                     if dr[:-5] in self.test_scenes:
                         continue
                     for cam in self.cam_ids:
-                        img_dir = os.path.join(drive_dir, 'image_' + cam, 'data')
+                        img_dir = os.path.join(drive_dir, 'image_' + cam, 'DataFlow')
                         N = len(glob(img_dir + '/*.png'))
                         for n in range(N):
                             frame_id = '%.10d' % n
@@ -114,7 +114,7 @@ class kitti_raw_loader(object):
 
     def load_image_raw(self, drive, cid, frame_id):
         date = drive[:10]
-        img_file = os.path.join(self.dataset_dir, date, drive, 'image_' + cid, 'data', frame_id + '.png')
+        img_file = os.path.join(self.dataset_dir, date, drive, 'image_' + cid, 'DataFlow', frame_id + '.png')
         img = scipy.misc.imread(img_file)
         return img
 

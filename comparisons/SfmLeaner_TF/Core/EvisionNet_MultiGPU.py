@@ -44,7 +44,7 @@ flags.DEFINE_integer("num_source", 2, "一个样本中有几个是source images,
 flags.DEFINE_integer('num_gpus', 4, "使用多少GPU")
 flags.DEFINE_integer('num_epochs', 30, "把整个训练集训练多少次")
 # params for model_test_depth
-flags.DEFINE_string("test_file_list", '../data/kitti/test_files_eigen.txt', "Path to the list of test files")
+flags.DEFINE_string("test_file_list", '../DataFlow/kitti/test_files_eigen.txt', "Path to the list of test files")
 flags.DEFINE_float("min_depth", 1e-3, "Threshold for minimum depth")
 flags.DEFINE_float("max_depth", 80, "Threshold for maximum depth")
 
@@ -386,7 +386,7 @@ def tower_loss(tgt_image, src_image_stack, intrinsics, scope):
     Args:
       scope: 指定显卡的唯一标识前缀, e.g. 'tower_0'
     Returns:
-       Tensor of shape [] containing the total loss for a batch of data
+       Tensor of shape [] containing the total loss for a batch of DataFlow
     """
 
     with tf.name_scope("depth_prediction"):

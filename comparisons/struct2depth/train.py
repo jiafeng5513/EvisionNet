@@ -38,8 +38,8 @@ import util
 gfile = tf.gfile
 MAX_TO_KEEP = 1000000  # Maximum number of checkpoints to keep.
 
-flags.DEFINE_string('data_dir', None, 'Preprocessed data.')
-flags.DEFINE_string('file_extension', 'png', 'Image data file extension.')
+flags.DEFINE_string('data_dir', None, 'Preprocessed DataFlow.')
+flags.DEFINE_string('file_extension', 'png', 'Image DataFlow file extension.')
 flags.DEFINE_float('learning_rate', 0.0002, 'Adam learning rate.')
 flags.DEFINE_float('beta1', 0.9, 'Adam momentum.')
 flags.DEFINE_float('reconstr_weight', 0.85, 'Frame reconstruction loss weight.')
@@ -76,7 +76,7 @@ flags.DEFINE_enum('flipping_mode', reader.FLIP_RANDOM,
                   'on-the-fly augmentation. Otherwise, flips the input images '
                   'always or never, respectively.')
 flags.DEFINE_string('pretrained_ckpt', None, 'Path to checkpoint with '
-                    'pretrained weights.  Do not include .data* extension.')
+                    'pretrained weights.  Do not include .DataFlow* extension.')
 flags.DEFINE_string('imagenet_ckpt', None, 'Initialize the weights according '
                     'to an ImageNet-pretrained checkpoint. Requires '
                     'architecture to be ResNet-18.')

@@ -78,7 +78,7 @@ class DataLoader(object):
         raw_cam_vec = tf.decode_csv(raw_cam_contents, record_defaults=rec_def)
         raw_cam_vec = tf.stack(raw_cam_vec)
         self.intrinsics = tf.reshape(raw_cam_vec, [3, 3])
-        print("data loader init")
+        print("DataFlow loader init")
 
 
     def load_train_batch(self):

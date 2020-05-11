@@ -149,7 +149,7 @@ class kittiOdomEval():
         self.max_speed = 0
         # pre-compute distances (from ground truth as reference)
         dist = self.trajectoryDistances(poses_gt)
-        # every second, kitti data 10Hz
+        # every second, kitti DataFlow 10Hz
         self.step_size = 10
         # for all start positions do
         # for first_frame in range(9, len(poses_gt), self.step_size):
@@ -677,7 +677,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='KITTI Evaluation toolkit')
     parser.add_argument('--gt_dir', type=str, default='./ground_truth_pose',
                         help='Directory path of the ground truth odometry')
-    parser.add_argument('--result_dir', type=str, default='./data/',
+    parser.add_argument('--result_dir', type=str, default='./DataFlow/',
                         help='Directory path of storing the odometry results')
     parser.add_argument('--eva_seqs', type=str, default='09_pred,10_pred,11_pred', help='The sequences to be evaluated')
     parser.add_argument('--toCameraCoord', type=lambda x: (str(x).lower() == 'true'), default=False,

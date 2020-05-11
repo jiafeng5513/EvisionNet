@@ -539,7 +539,7 @@ class Ui_MainWindow(object):
         self.label_40.setText(_translate("MainWindow", "beta"))
         self.pushButton_16.setText(_translate("MainWindow", "..."))
         self.label_33.setText(_translate("MainWindow", "rotation-mode"))
-        self.label_9.setText(_translate("MainWindow", "data:"))
+        self.label_9.setText(_translate("MainWindow", "DataFlow:"))
         self.label_19.setText(_translate("MainWindow", "dataset-format:"))
         self.label_35.setText(_translate("MainWindow", "epochs"))
         self.label_34.setText(_translate("MainWindow", "padding-mode"))

@@ -9,7 +9,7 @@ import os
 parser = argparse.ArgumentParser()
 parser.add_argument("--dataset_dir", type=str, required=True, help="where the dataset is stored")
 parser.add_argument("--dataset_name", type=str, required=True, choices=["kitti_raw_eigen", "kitti_raw_stereo", "kitti_odom", "cityscapes"])
-parser.add_argument("--dump_root", type=str, required=True, help="Where to dump the data")
+parser.add_argument("--dump_root", type=str, required=True, help="Where to dump the DataFlow")
 parser.add_argument("--seq_length", type=int, required=True, help="Length of each training sequence")
 parser.add_argument("--img_height", type=int, default=128, help="image height")
 parser.add_argument("--img_width", type=int, default=416, help="image width")

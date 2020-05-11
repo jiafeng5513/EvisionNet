@@ -14,7 +14,7 @@
 # limitations under the License.
 # ==============================================================================
 
-"""Reads data that is produced by dataset/gen_data.py."""
+"""Reads DataFlow that is produced by dataset/gen_data.py."""
 
 from __future__ import absolute_import
 from __future__ import division
@@ -178,7 +178,7 @@ class DataReader(object):
 
   @classmethod
   def augment_image_colorspace(cls, image_stack):
-    """Apply data augmentation to inputs."""
+    """Apply DataFlow augmentation to inputs."""
     image_stack_aug = image_stack
     # Randomly shift brightness.
     apply_brightness = tf.less(tf.random_uniform(

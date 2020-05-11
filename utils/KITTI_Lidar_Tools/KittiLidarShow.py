@@ -14,7 +14,7 @@ import numpy as np
 import mayavi.mlab  # error about backend, install PySide2
 
 # Kitti 激光雷达点云数据文件
-binfile = 'H:/data/KITTI/TestDepth-Odometry-09/bin/000020.bin'
+binfile = 'H:/DataFlow/KITTI/TestDepth-Odometry-09/bin/000020.bin'
 
 pointcloud = np.fromfile(str(binfile), dtype=np.float32, count=-1).reshape([-1, 4])
 

@@ -14,7 +14,7 @@
 # limitations under the License.
 # ==============================================================================
 
-""" Offline data generation for the Cityscapes dataset."""
+""" Offline DataFlow generation for the Cityscapes dataset."""
 
 import os
 from absl import app

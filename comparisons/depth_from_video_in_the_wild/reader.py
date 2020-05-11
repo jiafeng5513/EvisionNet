@@ -17,7 +17,7 @@
 
 This file is branched from the struct2depth project repository
 (https://github.com/tensorflow/models/tree/master/research/struct2depth),
-and it uses the same data format. The struct2depth repository has scripts for
+and it uses the same DataFlow format. The struct2depth repository has scripts for
 generating the inputs files.
 """
 
@@ -184,7 +184,7 @@ class DataReader(object):
 
   @classmethod
   def augment_image_colorspace(cls, image_stack):
-    """Apply data augmentation to inputs."""
+    """Apply DataFlow augmentation to inputs."""
     image_stack_aug = image_stack
     # Randomly shift brightness.
     apply_brightness = tf.less(tf.random_uniform(

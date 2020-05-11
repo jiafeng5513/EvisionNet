@@ -15,7 +15,7 @@ def load_as_float(path, sequence_length):
 
 
 class SequenceFolder(data.Dataset):
-    """A sequence data loader where the images are arranged in this way:
+    """A sequence DataFlow loader where the images are arranged in this way:
         root/scene_1/0000000.jpg
         root/scene_1/0000000_cam.txt
         root/scene_1/0000001.jpg

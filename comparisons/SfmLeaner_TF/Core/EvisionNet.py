@@ -41,7 +41,7 @@ flags.DEFINE_integer("save_latest_freq", 5000,"保存最新模型的频率(会�
 flags.DEFINE_boolean("continue_train", False, "是否从之前的ckpt继续训练")
 
 # params for model_test_depth
-flags.DEFINE_string("test_file_list",'../data/kitti/test_files_eigen.txt',"Path to the list of test files")
+flags.DEFINE_string("test_file_list",'../DataFlow/kitti/test_files_eigen.txt',"Path to the list of test files")
 flags.DEFINE_float("min_depth",1e-3,"Threshold for minimum depth")
 flags.DEFINE_float("max_depth",80,"Threshold for maximum depth")
 

@@ -31,7 +31,7 @@ def read_calib_file(path):
                 try:
                     data[key] = np.array(list(map(float, value.split(' '))))
                 except ValueError:
-                    # casting error: data[key] already eq. value, so pass
+                    # casting error: DataFlow[key] already eq. value, so pass
                     pass
 
     return data
@@ -63,7 +63,7 @@ def generate_depth_map(calib_dir, velo_file_name, im_shape, cam=2):
     P_velo2im = np.dot(np.dot(P_rect, R_cam2rect), velo2cam)
 
     # load velodyne points and remove all behind image plane (approximation)
-    # each row of the velodyne data is forward, left, up, reflectance
+    # each row of the velodyne DataFlow is forward, left, up, reflectance
     velo = load_velodyne_points(velo_file_name)
     velo = velo[velo[:, 0] >= 0, :]
 
@@ -131,9 +131,9 @@ def normalize_depth_for_display(depth, pc=95, crop_percent=0, normalizer=None, c
 
 if __name__ == '__main__':
     # 1. 从kitti_raw挑选要用的测试图片,将对应的png和bin复制到一个文件夹下,注意不要混用不同序列
-    test_input_dir = 'H:/data/KITTI/TestDepth-RAW-09-26'
+    test_input_dir = 'H:/DataFlow/KITTI/TestDepth-RAW-09-26'
     # 2. 测试图片所在序列的标定文件所在目录
-    calib_file_path = 'H:/data/KITTI/KittiRaw/2011_09_26'
+    calib_file_path = 'H:/DataFlow/KITTI/KittiRaw/2011_09_26'
     # 3.
     f_list = os.listdir(test_input_dir)
     bin_file_list = []

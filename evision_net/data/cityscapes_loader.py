@@ -45,7 +45,7 @@ class cityscapes_loader(object):
                 current_list.append(id)
                 previous = id
 
-        # create scene data dicts, and subsample scene every two frames
+        # create scene DataFlow dicts, and subsample scene every two frames
         for scene_id in connex_scenes.keys():
             intrinsics = self.load_intrinsics(city, scene_id)
             for subscene in connex_scenes[scene_id]:

@@ -68,7 +68,7 @@ def get_displacements_from_GPS(root, date, scene, indices, tgt_index, precision_
     reordered_indices = [indices[tgt_index]] + [*indices[:tgt_index]] + [*indices[tgt_index + 1:]]
     already_warned = False
     for index in reordered_indices:
-        oxts_data = np.genfromtxt(oxts_root/'data'/'{:010d}.txt'.format(index))
+        oxts_data = np.genfromtxt(oxts_root/'DataFlow'/'{:010d}.txt'.format(index))
 
         if not already_warned:
             position_precision = oxts_data[23]
@@ -96,7 +96,7 @@ def get_displacements_from_speed(root, date, scene, indices, tgt_index):
         timestamps = np.array([datetime.datetime.strptime(ts[:-3], "%Y-%m-%d %H:%M:%S.%f").timestamp() for ts in f.read().splitlines()])
     speeds = np.zeros((len(indices), 3))
     for i, index in enumerate(indices):
-        oxts_data = np.genfromtxt(oxts_root/'data'/'{:010d}.txt'.format(index))
+        oxts_data = np.genfromtxt(oxts_root/'DataFlow'/'{:010d}.txt'.format(index))
         speeds[i] = oxts_data[[6,7,10]]
     displacements = np.zeros((len(indices), 3))
     # Perform the integration operation, using trapezoidal method
@@ -129,7 +129,7 @@ def read_scene_data(data_root, test_list, seq_length=3, step=1, use_gps=True):
         ref_indices = shift_range + np.clip(int(index), step*demi_length, scene_length - step*demi_length - 1)
 
         ref_imgs_path = [tgt_img_path.dirname()/'{:010d}.png'.format(i) for i in ref_indices]
-        vel_path = data_root/date/scene/'velodyne_points'/'data'/'{}.bin'.format(index[:10])
+        vel_path = data_root/date/scene/'velodyne_points'/'DataFlow'/'{}.bin'.format(index[:10])
 
         if tgt_img_path.isfile():
             gt_files.append(vel_path)
@@ -169,7 +169,7 @@ def read_calib_file(path):
                 try:
                     data[key] = np.array(list(map(float, value.split(' '))))
                 except ValueError:
-                    # casting error: data[key] already eq. value, so pass
+                    # casting error: DataFlow[key] already eq. value, so pass
                     pass
 
     return data
@@ -194,7 +194,7 @@ def generate_depth_map(calib_dir, velo_file_name, im_shape, cam=2):
     P_velo2im = np.dot(np.dot(P_rect, R_cam2rect), velo2cam)
 
     # load velodyne points and remove all behind image plane (approximation)
-    # each row of the velodyne data is forward, left, up, reflectance
+    # each row of the velodyne DataFlow is forward, left, up, reflectance
     velo = load_velodyne_points(velo_file_name)
     velo = velo[velo[:, 0] >= 0, :]
 

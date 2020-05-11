@@ -32,13 +32,13 @@ def read_file_list(filename):
     
     File format:
     The file format is "stamp d1 d2 d3 ...", where stamp denotes the time stamp (to be matched)
-    and "d1 d2 d3.." is arbitary data (e.g., a 3D position and 3D orientation) associated to this timestamp. 
+    and "d1 d2 d3.." is arbitary DataFlow (e.g., a 3D position and 3D orientation) associated to this timestamp.
     
     Input:
     filename -- File name
     
     Output:
-    dict -- dictionary of (stamp,data) tuples
+    dict -- dictionary of (stamp,DataFlow) tuples
     
     """
     file = open(filename)
@@ -50,12 +50,12 @@ def read_file_list(filename):
 
 def associate(first_list, second_list,offset,max_difference):
     """
-    Associate two dictionaries of (stamp,data). As the time stamps never match exactly, we aim 
+    Associate two dictionaries of (stamp,DataFlow). As the time stamps never match exactly, we aim
     to find the closest match for every input tuple.
     
     Input:
-    first_list -- first dictionary of (stamp,data) tuples
-    second_list -- second dictionary of (stamp,data) tuples
+    first_list -- first dictionary of (stamp,DataFlow) tuples
+    second_list -- second dictionary of (stamp,DataFlow) tuples
     offset -- time offset between both dictionaries (e.g., to models the delay between the sensors)
     max_difference -- search radius for candidate generation
 

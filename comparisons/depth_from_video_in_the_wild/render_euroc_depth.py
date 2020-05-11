@@ -34,7 +34,7 @@ import matplotlib.image
 import numpy as np
 
 
-flags.DEFINE_string('room_path', '', 'Path to the EuRoC data for one of the '
+flags.DEFINE_string('room_path', '', 'Path to the EuRoC DataFlow for one of the '
                     'rooms ')
 
 flags.DEFINE_string('output_path', '', 'Path where to store the outputs.')
@@ -312,14 +312,14 @@ def sample_uniform(xyz, bin_size):
 def main(argv):
   del argv  # unused
   gti = GroundTruthInterpolator(
-      os.path.join(FLAGS.room_path, 'state_groundtruth_estimate0/data.csv'))
+      os.path.join(FLAGS.room_path, 'state_groundtruth_estimate0/DataFlow.csv'))
   print('Groundtruth loaded.')
-  xyz, c = read_ply(os.path.join(FLAGS.room_path, 'pointcloud0/data.ply'))
+  xyz, c = read_ply(os.path.join(FLAGS.room_path, 'pointcloud0/DataFlow.ply'))
   print('PLY loaded.')
   xyz_homogeneous = np.concatenate([xyz, np.ones((xyz.shape[0], 1))], axis=1)
 
   imagesto_render = sorted(
-      os.listdir(os.path.join(FLAGS.room_path, 'cam0/data')))
+      os.listdir(os.path.join(FLAGS.room_path, 'cam0/DataFlow')))
 
   imagesto_render = imagesto_render[0::5]  # render every fifth image
 

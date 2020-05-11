@@ -59,7 +59,7 @@ INFERENCE_CROP_CITYSCAPES = 'cityscapes'
 
 
 flags.DEFINE_string('output_dir', None, 'Directory to store predictions.')
-flags.DEFINE_string('file_extension', 'png', 'Image data file extension of '
+flags.DEFINE_string('file_extension', 'png', 'Image DataFlow file extension of '
                     'files provided with input_dir. Also determines the output '
                     'file format of depth prediction images.')
 flags.DEFINE_bool('depth', True, 'Determines if the depth prediction network '
@@ -168,7 +168,7 @@ def _run_inference(output_dir=None,
     im_files, basepath_in = collect_input_images(input_dir, input_list_file,
                                                  file_extension)
     if shuffle:
-      logging.info('Shuffling data...')
+      logging.info('Shuffling DataFlow...')
       np.random.shuffle(im_files)
     logging.info('Running inference on %d files.', len(im_files))
 
