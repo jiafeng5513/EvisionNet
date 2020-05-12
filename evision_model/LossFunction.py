@@ -80,13 +80,13 @@ MIN_OBJECT_AREA = 20
 
 class LossFactory(object):
     # public : 构造函数
-    def __init__(self, SEQ_LENGTH=3, reconstr_weight=0.85, smooth_weight=1e-2, ssim_weight=1.5,
+    def __init__(self, SEQ_LENGTH=3, rgb_weight=0.85, depth_smoothing_weight=1e-2, ssim_weight=1.5,
                  motion_smoothing_weight=1e-3, rotation_consistency_weight=1e-3,
                  translation_consistency_weight=1e-2, depth_consistency_loss_weight=1e-2):
         # 构造函数用于传入权重系数
         self.SEQ_LENGTH = SEQ_LENGTH
-        self.reconstr_weight = reconstr_weight
-        self.smooth_weight = smooth_weight
+        self.rgb_weight = rgb_weight
+        self.depth_smoothing_weight = depth_smoothing_weight
         self.ssim_weight = ssim_weight
         self.motion_smoothing_weight = motion_smoothing_weight
         self.rotation_consistency_weight = rotation_consistency_weight
@@ -169,9 +169,9 @@ class LossFactory(object):
         # 加权
         _total_loss = \
             max(0.0, self.motion_smoothing_weight) * _motion_smoothing + \
-            max(0.0, self.smooth_weight) * _depth_smoothing_loss + \
+            max(0.0, self.depth_smoothing_weight) * _depth_smoothing_loss + \
             max(0.0, self.depth_consistency_loss_weight) * _depth_consistency_loss + \
-            max(0.0, self.reconstr_weight) * _rgb_loss + \
+            max(0.0, self.rgb_weight) * _rgb_loss + \
             max(0.0, self.ssim_weight) * _ssim_loss + \
             max(0.0, self.rotation_consistency_weight) * _rot_loss + \
             max(0.0, self.translation_consistency_weight) * _trans_loss

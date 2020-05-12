@@ -82,10 +82,11 @@ class IntrinsicsModule(nn.Module):
 
 
 class MotionNet(nn.Module):
-    def __init__(self):
+    def __init__(self, intrinsic_pred=True):
         super(MotionNet, self).__init__()
         # 7个3*3的2D卷积构成编码器
         # torch.nn.Conv2d(in_channels, out_channels, kernel_size, stride=1, padding=0, dilation=1, groups=1, bias=True)
+        self.intrinsic_pred = intrinsic_pred
         encode_channels = [6, 16, 32, 64, 128, 256, 512, 1024]
         self.conv1 = nn.Sequential(nn.Conv2d(in_channels=encode_channels[0], out_channels=encode_channels[1],
                                              kernel_size=3, stride=2, padding=1), nn.ReLU(inplace=True))
@@ -103,7 +104,8 @@ class MotionNet(nn.Module):
                                              kernel_size=3, stride=2, padding=1), nn.ReLU(inplace=True))
         # 瓶颈衔接处
         self.conv8 = nn.Conv2d(in_channels=1024, out_channels=6, kernel_size=1, stride=1)  # TODO:in_channels is wrong!
-        self.intrinsics_subnet = IntrinsicsModule()
+        if self.intrinsic_pred:
+            self.intrinsics_subnet = IntrinsicsModule()
         # 8个 refine构成解码器
         self.refine1 = RefineModule(motion_field_channel=3, layer_channel=encode_channels[7])  # translation, conv7
         self.refine2 = RefineModule(motion_field_channel=3, layer_channel=encode_channels[6])  # refine1_out, conv6
@@ -129,8 +131,10 @@ class MotionNet(nn.Module):
         background_motion = self.conv8(bottleneck)  # [b,6,1,1]
         rotation = background_motion[:, :3, 0, 0]  # [B, 3]
         translation = background_motion[:, 3:, :, :]  # [B, 3, 1, 1],
-        N, C, image_height, image_width = images.shape
-        intrinsic_mat = self.intrinsics_subnet(bottleneck, image_height, image_width)   # [b,3,3]
+        intrinsic_mat = bottleneck
+        if self.intrinsic_pred:
+            N, C, image_height, image_width = images.shape
+            intrinsic_mat = self.intrinsics_subnet(bottleneck, image_height, image_width)   # [b,3,3]
 
         # 解码器
         refine_out_1 = self.refine1(translation, conv_out_7)  # [b,3,h/128,w/128]
@@ -151,7 +155,10 @@ class MotionNet(nn.Module):
         # translation : [b,3,1,1]
         # residual_translation : [b,3,h,w]
         # intrinsic_mat : [b,3,3]
-        return (rotation, translation, residual_translation, intrinsic_mat)
+        if self.intrinsic_pred:
+            return (rotation, translation, residual_translation, intrinsic_mat)
+        else:
+            return (rotation, translation, residual_translation)
 
 
 if __name__ == '__main__':

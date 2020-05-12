@@ -21,6 +21,7 @@ import shutil
 import models
 import custom_transforms
 from DataFlow.validation_folders import ValidationSet
+from LossFunction import LossFactory
 
 """命令行参数"""
 parser = argparse.ArgumentParser(description='EvisionNet', formatter_class=argparse.ArgumentDefaultsHelpFormatter)
@@ -34,7 +35,7 @@ parser.add_argument('--pretrained-depthnet', dest='pretrained_depth', default=No
 parser.add_argument('--pretrained-motionnet', dest='pretrained_motion', default=None, metavar='PATH',
                     help='预训练MotionNet的路径')
 """超参数"""
-parser.add_argument('--sequence-length', type=int, metavar='N', help='每个训练样本由几帧构成', default=3)
+parser.add_argument('--SEQ_LENGTH', type=int, metavar='N', help='每个训练样本由几帧构成', default=3)
 parser.add_argument('--lr', '--learning_rate', default=1e-4, type=float, metavar='LR', help='学习率')
 parser.add_argument('--batch_size', default=4, type=int, help='batch size')
 parser.add_argument('--epoch-size', default=3000, type=int, metavar='N', help='手动设置每个epoch的样本数量')
@@ -110,7 +111,7 @@ def main():
     print("=> creating models")
 
     depth_net = models.DepthNet().to(device)
-    motion_net = models.MotionNet().to(device)
+    motion_net = models.MotionNet(intrinsic_pred=args.intri_pred).to(device)
 
     if args.pretrained_depth:
         print("=> using pre-trained weights for DepthNet")
@@ -137,23 +138,31 @@ def main():
                     {'params': motion_net.parameters(), 'lr': args.lr}]
 
     optimizer = torch.optim.Adam(optim_params, betas=(args.momentum, args.beta), weight_decay=args.weight_decay)
-
-    """========= step 7 : 训练循环 =========="""
+    """====== step 7 : 初始化损失函数计算器======="""
+    total_loss_calculator = LossFactory(SEQ_LENGTH=args.SEQ_LENGTH,
+                                        rgb_weight=args.rgb_weight,
+                                        depth_smoothing_weight=args.depth_smoothing_weight,
+                                        ssim_weight=args.ssim_weight,
+                                        motion_smoothing_weight=args.motion_smoothing_weight,
+                                        rotation_consistency_weight=args.rotation_consistency_weight,
+                                        translation_consistency_weight=args.translation_consistency_weight,
+                                        depth_consistency_loss_weight=args.depth_consistency_loss_weight)
+    """========= step 8 : 训练循环 =========="""
     if args.epoch_size == 0:
         args.epoch_size = len(train_loader)  # 如果不指定epoch_size,那么每一个epoch就把全部的训练数据过一遍
     for epoch in range(args.epochs):
         tqdm.write("\n===========TRAIN EPOCH [{}/{}]===========".format(epoch + 1, args.epochs))
-        """====== step 7.1 : 训练一个epoch ======"""
-        train_loss = train(args, train_loader, depth_net, motion_net, optimizer, args.epoch_size, tb_writer)
+        """====== step 8.1 : 训练一个epoch ======"""
+        train_loss = train(args, train_loader, depth_net, motion_net, optimizer, args.epoch_size)
         tqdm.write('* Avg Loss : {:.3f}'.format(train_loss))
-        """======= step 7.2 : 验证 ========"""
+        """======= step 8.2 : 验证 ========"""
         # 验证时要输出 : 深度指标abs_diff, abs_rel, sq_rel, a1, a2, a3
         errors, error_names = validate_with_gt(args, val_loader, depth_net, motion_net, epoch)
         error_string = ', '.join('{} : {:.3f}'.format(name, error) for name, error in zip(error_names, errors))
         tqdm.write(error_string)
         # TODO:输出验证集上的轨迹指标
 
-        """======= step 7.3 : 保存验证效果最佳的模型状态 =========="""
+        """======= step 8.3 : 保存验证效果最佳的模型状态 =========="""
         decisive_error = errors[1]  # 选取abs_real作为关键评价指标,注意论文上我们以a3为关键指标
         if best_error < 0:
             best_error = decisive_error
@@ -164,6 +173,7 @@ def main():
         save_checkpoint(args.save_path, {'epoch': epoch + 1, 'state_dict': depth_net.module.state_dict()},
                         {'epoch': epoch + 1, 'state_dict': motion_net.module.state_dict()}, is_best)
     pass  # end of main
+
 
 def save_path_formatter(args, parser):
     # TODO:超参数的名字需要更新
@@ -196,8 +206,9 @@ def save_path_formatter(args, parser):
     timestamp = datetime.datetime.now().strftime("%m-%d-%H%M")
     return save_path / timestamp
 
+
 # 训练一个epoch
-def train(args, train_loader, depth_net, motion_net, optimizer, epoch_size, tb_writer):
+def train(args, train_loader, depth_net, motion_net, optimizer, epoch_size, loss_calculator):
     global n_iter, device
     batch_time = AverageMeter()
     data_time = AverageMeter()
@@ -214,69 +225,82 @@ def train(args, train_loader, depth_net, motion_net, optimizer, epoch_size, tb_w
     train_pbar.set_description('Train: Total Loss=#.####(#.####)')
     train_pbar.set_postfix_str('<TIME: op=#.###(#.###) DataFlow=#.###(#.###)>')
     """============ 3. 开始训练这一个epoch的数据============"""
-    for i, (tgt_img, ref_imgs, intrinsics, intrinsics_inv) in enumerate(train_loader):
+    for i, (imgs, obj_masks, gt_intrinsics) in enumerate(train_loader):
         log_losses = i > 0 and n_iter % args.print_freq == 0
         log_output = args.training_output_freq > 0 and n_iter % args.training_output_freq == 0
 
-        # measure DataFlow loading time
+        """======3.1 计时======"""
         data_time.update(time.time() - end)
-        tgt_img = tgt_img.to(device)
-        ref_imgs = [img.to(device) for img in ref_imgs]
-        intrinsics = intrinsics.to(device)
+        """======3.2 传输数据到计算设备======"""
+        imgs = imgs.to(device)  # list of [B,3,h,w], list length = SEQ_LENGTH
+        obj_masks = obj_masks.to(device)  # list of [B,1,h,w], list length = SEQ_LENGTH
+        gt_intrinsics = gt_intrinsics.to(device)  # [3,3]
+        """======3.3 计算网络模型的输出======"""
+        depth_pred_list = []
+        for item in imgs:
+            depth_pred_list.append(depth_net(item))# 深度预测
+        rot_pred_list = []
+        inv_rot_pred_list = []
+        trans_pred_list = []
+        inv_trans_pred_list = []
+        trans_res_pred_list = []
+        inv_trans_res_pred_list = []
+        intrinsic_pred = torch.zeros(3, 3)
+        for j in range(args.SEQ_LENGTH-1):
+            a = j
+            b = j+1
+            image_a = imgs[a]
+            image_b = imgs[b]
 
-        # compute output
-        disparities = disp_net(tgt_img)  #
-        # depth = [1 / disp for disp in disparities]
-        depth = disparities
-        explainability_mask, pose, intrinsics_pred = pose_exp_net(tgt_img, ref_imgs)
-
+            if args.intri_pred:
+                # 输入的图像是二连帧,在第二个通道上堆叠[B,6,H,W]
+                (rotation, translation, residual_translation, pred_intrinsic) = motion_net(
+                                                                                torch.cat((image_a, image_b), dim=1))
+                rot_pred_list.append(rotation)
+                trans_pred_list.append(translation)
+                trans_res_pred_list.append(residual_translation)
+                (inv_rotation, inv_translation, inv_residual_translation, inv_pred_intrinsic) = motion_net(
+                                                                                torch.cat((image_b, image_a), dim=1))
+                inv_rot_pred_list.append(inv_rotation)
+                inv_trans_pred_list.append(inv_translation)
+                inv_trans_res_pred_list.append(inv_residual_translation)
+                intrinsic_pred += (inv_pred_intrinsic+pred_intrinsic)*0.5
+            else:
+                (rotation, translation, residual_translation) = motion_net(
+                                                                            torch.cat((image_a, image_b), dim=1))
+                rot_pred_list.append(rotation)
+                trans_pred_list.append(translation)
+                trans_res_pred_list.append(residual_translation)
+                (inv_rotation, inv_translation, inv_residual_translation) = motion_net(
+                                                                            torch.cat((image_b, image_a), dim=1))
+                inv_rot_pred_list.append(inv_rotation)
+                inv_trans_pred_list.append(inv_translation)
+                inv_trans_res_pred_list.append(inv_residual_translation)
+        intrinsic_pred = intrinsic_pred / (args.SEQ_LENGTH-1)
+        """======3.4 计算损失======"""
         if args.intri_pred:
-            # construct intrinsics[4,3,3] with intrinsics_pred[4,4]
-            tmin = intrinsics_pred_decode(intrinsics_pred).to(device)
-            loss_1, warped, diff = photometric_reconstruction_loss(tgt_img, ref_imgs, tmin,
-                                                                   depth, explainability_mask, pose,
-                                                                   args.rotation_mode, args.padding_mode)
+            total_loss = loss_calculator.getTotalLoss(imgs, depth_pred_list,
+                                                      trans_pred_list, trans_res_pred_list, rot_pred_list,
+                                                      inv_trans_pred_list, inv_trans_res_pred_list, inv_rot_pred_list,
+                                                      intrinsic_pred, obj_masks)
         else:
-            loss_1, warped, diff = photometric_reconstruction_loss(tgt_img, ref_imgs, intrinsics,
-                                                                   depth, explainability_mask, pose,
-                                                                   args.rotation_mode, args.padding_mode)
-        if w2 > 0:
-            loss_2 = explainability_loss(explainability_mask)
-        else:
-            loss_2 = 0
-        loss_3 = smooth_loss(depth)
-
-        loss = w1 * loss_1 + w2 * loss_2 + w3 * loss_3
-
-        if loss < 0.0005:
-            abc = 0
-        if log_losses:
-            tb_writer.add_scalar('photometric_error', loss_1.item(), n_iter)
-            if w2 > 0:
-                tb_writer.add_scalar('explanability_loss', loss_2.item(), n_iter)
-            tb_writer.add_scalar('disparity_smoothness_loss', loss_3.item(), n_iter)
-            tb_writer.add_scalar('total_loss', loss.item(), n_iter)
-
-        if log_output:
-            tb_writer.add_image('train Input', tensor2array(tgt_img[0]), n_iter)
-            for k, scaled_maps in enumerate(zip(depth, disparities, warped, diff, explainability_mask)):
-                log_output_tensorboard(tb_writer, "train", 0, k, n_iter, *scaled_maps)
+            total_loss = loss_calculator.getTotalLoss(imgs, depth_pred_list,
+                                                      trans_pred_list, trans_res_pred_list, rot_pred_list,
+                                                      inv_trans_pred_list, inv_trans_res_pred_list, inv_rot_pred_list,
+                                                      gt_intrinsics, obj_masks)
 
         # record loss and EPE
-        losses.update(loss.item(), args.batch_size)
+        losses.update(total_loss.item(), args.batch_size)
 
-        # compute gradient and do Adam step
+        """======3.5 梯度计算和更新======"""
         optimizer.zero_grad()
-        loss.backward()
+        total_loss.backward()
         optimizer.step()
 
         # measure elapsed time
         batch_time.update(time.time() - end)
         end = time.time()
 
-        with open(args.save_path / args.log_full, 'a') as csvfile:
-            writer = csv.writer(csvfile, delimiter='\t')
-            writer.writerow([loss.item(), loss_1.item(), loss_2.item() if w2 > 0 else 0, loss_3.item()])
         train_pbar.clear()
         train_pbar.update(1)
         train_pbar.set_description('Train: Total Loss={}'.format(losses))

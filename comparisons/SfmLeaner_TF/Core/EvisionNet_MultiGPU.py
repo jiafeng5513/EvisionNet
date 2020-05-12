@@ -332,8 +332,8 @@ def loss(tgt_image, src_image_stack, intrinsics, pred_disp, pred_poses, pred_exp
                                                         [int(FLAGS.img_height / (2 ** s)),
                                                          int(FLAGS.img_width / (2 ** s))])
 
-            if FLAGS.smooth_weight > 0:
-                smooth_loss += FLAGS.smooth_weight / (2 ** s) * \
+            if FLAGS.depth_smoothing_weight > 0:
+                smooth_loss += FLAGS.depth_smoothing_weight / (2 ** s) * \
                                compute_smooth_loss(pred_disp[s])
 
             for i in range(FLAGS.num_source):
@@ -831,7 +831,7 @@ def main(_):
     param_log_str = 'epoch={},init_lr={}(decay by {} in every{}epochs),momentum={},W_smooth={},W_explain={},' \
                     'batch size={}' \
         .format(FLAGS.num_epochs, FLAGS.learning_rate, FLAGS.learning_rate_decay_factor, FLAGS.num_epochs_per_decay
-                , FLAGS.beta1, FLAGS.smooth_weight, FLAGS.explain_reg_weight, FLAGS.batch_size)
+                , FLAGS.beta1, FLAGS.depth_smoothing_weight, FLAGS.explain_reg_weight, FLAGS.batch_size)
     log(param_log_str)
     _start_time = time.time()
     if FLAGS.run_mode == 0:

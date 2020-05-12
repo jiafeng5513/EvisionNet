@@ -304,9 +304,9 @@ class EvisionNet(object):
                 curr_src_image_stack = tf.image.resize_area(src_image_stack, 
                     [int(opt.img_height/(2**s)), int(opt.img_width/(2**s))])
 
-                if opt.smooth_weight > 0:
-                    smooth_loss += opt.smooth_weight/(2**s) * \
-                        self.compute_smooth_loss(pred_disp[s])
+                if opt.depth_smoothing_weight > 0:
+                    smooth_loss += opt.depth_smoothing_weight / (2 ** s) * \
+                                   self.compute_smooth_loss(pred_disp[s])
 
                 for i in range(opt.num_source):
                     # Inverse warp the source image to the target image frame

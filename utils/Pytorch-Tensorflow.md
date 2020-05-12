@@ -5,7 +5,7 @@
 | 1| tf.expand_dims(x, 1)|torch.unsqueeze(x, 1)|沿着指定位置扩展维度|
 | 2| tf.squeeze | torch.squeeze|去除等于1的维度|
 | 3| tf.unstack(x,dim=1)|torch.unbind(x,dim=1)|沿着指定的维度拆开张量|
-| 4| tf.concat(x,i)|torch.cat(x.i)|沿着指点的维度链接|
+| 4| tf.concat(x,i)|torch.cat(x,i)|沿着指点的维度链接|
 | 5| tf.is_nan() |torch.isnan()|判断是否为nan|
 | 6| tf.logical_and(x,y) | x.mul(y).bool()|逻辑与|
 | 7| tf.greater(x, y) | torch.gt(x,y) |返回一个x>y的位置为true的张量|
