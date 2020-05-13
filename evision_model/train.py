@@ -11,7 +11,6 @@ from torch.utils.data import DataLoader
 import torch.backends.cudnn as cudnn
 from collections import OrderedDict
 import sys
-import csv
 from path import Path
 import datetime
 from tqdm import tqdm
@@ -58,10 +57,11 @@ parser.add_argument('--translation_consistency_weight', default=1e-2, type=float
 
 parser.add_argument('--log-output', action='store_true', help='开启后,验证期间dispnet的输出和重投影图片会被保存')
 parser.add_argument('--print-freq', default=10, type=int, metavar='N', help='print frequency')
-parser.add_argument('-f', '--training-output-freq', type=int, help='训练期间输出dispnet和重投影图片的频率,设为0则不输出', metavar='N', default=0)
+parser.add_argument('-f', '--training-output-freq', type=int, help='训练期间输出dispnet和重投影图片的频率,设为0则不输出',
+                    metavar='N', default=0)
 """   全局变量   """
 best_error = -1  # 用于识别当前最佳的模型状态
-n_iter = 0      # 训练的次数
+n_iter = 0  # 训练的次数
 device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")  # 计算设备
 
 
@@ -153,7 +153,7 @@ def main():
     for epoch in range(args.epochs):
         tqdm.write("\n===========TRAIN EPOCH [{}/{}]===========".format(epoch + 1, args.epochs))
         """====== step 8.1 : 训练一个epoch ======"""
-        train_loss = train(args, train_loader, depth_net, motion_net, optimizer, args.epoch_size)
+        train_loss = train(args, train_loader, depth_net, motion_net, optimizer, args.epoch_size, total_loss_calculator)
         tqdm.write('* Avg Loss : {:.3f}'.format(train_loss))
         """======= step 8.2 : 验证 ========"""
         # 验证时要输出 : 深度指标abs_diff, abs_rel, sq_rel, a1, a2, a3
@@ -173,38 +173,6 @@ def main():
         save_checkpoint(args.save_path, {'epoch': epoch + 1, 'state_dict': depth_net.module.state_dict()},
                         {'epoch': epoch + 1, 'state_dict': motion_net.module.state_dict()}, is_best)
     pass  # end of main
-
-
-def save_path_formatter(args, parser):
-    # TODO:超参数的名字需要更新
-    def is_default(key, value):
-        return value == parser.get_default(key)
-
-    args_dict = vars(args)
-    data_folder_name = str(Path(args_dict['DataFlow']).normpath().name)
-    folder_string = [data_folder_name]
-    if not is_default('epochs', args_dict['epochs']):
-        folder_string.append('{}epochs'.format(args_dict['epochs']))
-    keys_with_prefix = OrderedDict()
-    keys_with_prefix['epoch_size'] = 'epoch_size'
-    keys_with_prefix['sequence_length'] = 'seq'
-    keys_with_prefix['rotation_mode'] = 'rot_'
-    keys_with_prefix['padding_mode'] = 'padding_'
-    keys_with_prefix['batch_size'] = 'b'
-    keys_with_prefix['lr'] = 'lr'
-    keys_with_prefix['photo_loss_weight'] = 'p'
-    keys_with_prefix['mask_loss_weight'] = 'm'
-    keys_with_prefix['smooth_loss_weight'] = 's'
-
-    for key, prefix in keys_with_prefix.items():
-        value = args_dict[key]
-        if not is_default(key, value):
-            folder_string.append('{}{}'.format(prefix, value))
-    if args.intri_pred:
-        folder_string.append('calib')
-    save_path = Path(','.join(folder_string))
-    timestamp = datetime.datetime.now().strftime("%m-%d-%H%M")
-    return save_path / timestamp
 
 
 # 训练一个epoch
@@ -238,7 +206,7 @@ def train(args, train_loader, depth_net, motion_net, optimizer, epoch_size, loss
         """======3.3 计算网络模型的输出======"""
         depth_pred_list = []
         for item in imgs:
-            depth_pred_list.append(depth_net(item))# 深度预测
+            depth_pred_list.append(depth_net(item))  # 深度预测
         rot_pred_list = []
         inv_rot_pred_list = []
         trans_pred_list = []
@@ -246,37 +214,37 @@ def train(args, train_loader, depth_net, motion_net, optimizer, epoch_size, loss
         trans_res_pred_list = []
         inv_trans_res_pred_list = []
         intrinsic_pred = torch.zeros(3, 3)
-        for j in range(args.SEQ_LENGTH-1):
+        for j in range(args.SEQ_LENGTH - 1):
             a = j
-            b = j+1
+            b = j + 1
             image_a = imgs[a]
             image_b = imgs[b]
 
             if args.intri_pred:
                 # 输入的图像是二连帧,在第二个通道上堆叠[B,6,H,W]
                 (rotation, translation, residual_translation, pred_intrinsic) = motion_net(
-                                                                                torch.cat((image_a, image_b), dim=1))
+                    torch.cat((image_a, image_b), dim=1))
                 rot_pred_list.append(rotation)
                 trans_pred_list.append(translation)
                 trans_res_pred_list.append(residual_translation)
                 (inv_rotation, inv_translation, inv_residual_translation, inv_pred_intrinsic) = motion_net(
-                                                                                torch.cat((image_b, image_a), dim=1))
+                    torch.cat((image_b, image_a), dim=1))
                 inv_rot_pred_list.append(inv_rotation)
                 inv_trans_pred_list.append(inv_translation)
                 inv_trans_res_pred_list.append(inv_residual_translation)
-                intrinsic_pred += (inv_pred_intrinsic+pred_intrinsic)*0.5
+                intrinsic_pred += (inv_pred_intrinsic + pred_intrinsic) * 0.5
             else:
                 (rotation, translation, residual_translation) = motion_net(
-                                                                            torch.cat((image_a, image_b), dim=1))
+                    torch.cat((image_a, image_b), dim=1))
                 rot_pred_list.append(rotation)
                 trans_pred_list.append(translation)
                 trans_res_pred_list.append(residual_translation)
                 (inv_rotation, inv_translation, inv_residual_translation) = motion_net(
-                                                                            torch.cat((image_b, image_a), dim=1))
+                    torch.cat((image_b, image_a), dim=1))
                 inv_rot_pred_list.append(inv_rotation)
                 inv_trans_pred_list.append(inv_translation)
                 inv_trans_res_pred_list.append(inv_residual_translation)
-        intrinsic_pred = intrinsic_pred / (args.SEQ_LENGTH-1)
+        intrinsic_pred = intrinsic_pred / (args.SEQ_LENGTH - 1)
         """======3.4 计算损失======"""
         if args.intri_pred:
             total_loss = loss_calculator.getTotalLoss(imgs, depth_pred_list,
@@ -312,36 +280,6 @@ def train(args, train_loader, depth_net, motion_net, optimizer, epoch_size, loss
     train_pbar.close()
     time.sleep(1)
     return losses.avg[0]
-
-
-class AverageMeter(object):
-    """Computes and stores the average and current value"""
-
-    def __init__(self, i=1, precision=3):
-        self.meters = i
-        self.precision = precision
-        self.reset(self.meters)
-
-    def reset(self, i):
-        self.val = [0] * i
-        self.avg = [0] * i
-        self.sum = [0] * i
-        self.count = 0
-
-    def update(self, val, n=1):
-        if not isinstance(val, list):
-            val = [val]
-        assert (len(val) == self.meters)
-        self.count += n
-        for i, v in enumerate(val):
-            self.val[i] = v
-            self.sum[i] += v * n
-            self.avg[i] = self.sum[i] / self.count
-
-    def __repr__(self):
-        val = ' '.join(['{:.{}f}'.format(v, self.precision) for v in self.val])
-        avg = ' '.join(['{:.{}f}'.format(a, self.precision) for a in self.avg])
-        return '{}({})'.format(val, avg)
 
 
 # 验证
@@ -422,6 +360,38 @@ def compute_errors(gt, pred, crop=True):
     return [metric.item() / batch_size for metric in [abs_diff, abs_rel, sq_rel, a1, a2, a3]]
 
 
+def save_path_formatter(args, parser):
+    # TODO:超参数的名字需要更新
+    def is_default(key, value):
+        return value == parser.get_default(key)
+
+    args_dict = vars(args)
+    data_folder_name = str(Path(args_dict['DataFlow']).normpath().name)
+    folder_string = [data_folder_name]
+    if not is_default('epochs', args_dict['epochs']):
+        folder_string.append('{}epochs'.format(args_dict['epochs']))
+    keys_with_prefix = OrderedDict()
+    keys_with_prefix['epoch_size'] = 'epoch_size'
+    keys_with_prefix['sequence_length'] = 'seq'
+    keys_with_prefix['rotation_mode'] = 'rot_'
+    keys_with_prefix['padding_mode'] = 'padding_'
+    keys_with_prefix['batch_size'] = 'b'
+    keys_with_prefix['lr'] = 'lr'
+    keys_with_prefix['photo_loss_weight'] = 'p'
+    keys_with_prefix['mask_loss_weight'] = 'm'
+    keys_with_prefix['smooth_loss_weight'] = 's'
+
+    for key, prefix in keys_with_prefix.items():
+        value = args_dict[key]
+        if not is_default(key, value):
+            folder_string.append('{}{}'.format(prefix, value))
+    if args.intri_pred:
+        folder_string.append('calib')
+    save_path = Path(','.join(folder_string))
+    timestamp = datetime.datetime.now().strftime("%m-%d-%H%M")
+    return save_path / timestamp
+
+
 def save_checkpoint(save_path, depth_net_state, motion_net_state, is_best, filename='checkpoint.pth.tar'):
     file_prefixes = ['depth_net', 'motion_net']
     states = [depth_net_state, motion_net_state]
@@ -432,3 +402,33 @@ def save_checkpoint(save_path, depth_net_state, motion_net_state, is_best, filen
         for prefix in file_prefixes:
             shutil.copyfile(save_path / '{}_{}'.format(prefix, filename),
                             save_path / '{}_model_best.pth.tar'.format(prefix))
+
+
+class AverageMeter(object):
+    """Computes and stores the average and current value"""
+
+    def __init__(self, i=1, precision=3):
+        self.meters = i
+        self.precision = precision
+        self.reset(self.meters)
+
+    def reset(self, i):
+        self.val = [0] * i
+        self.avg = [0] * i
+        self.sum = [0] * i
+        self.count = 0
+
+    def update(self, val, n=1):
+        if not isinstance(val, list):
+            val = [val]
+        assert (len(val) == self.meters)
+        self.count += n
+        for i, v in enumerate(val):
+            self.val[i] = v
+            self.sum[i] += v * n
+            self.avg[i] = self.sum[i] / self.count
+
+    def __repr__(self):
+        val = ' '.join(['{:.{}f}'.format(v, self.precision) for v in self.val])
+        avg = ' '.join(['{:.{}f}'.format(a, self.precision) for a in self.avg])
+        return '{}({})'.format(val, avg)
