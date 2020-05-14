@@ -23,13 +23,15 @@ parser.add_argument("--dump-root", type=str, default='dump', help="Where to dump
 parser.add_argument("--height", type=int, default=128, help="image height")
 parser.add_argument("--width", type=int, default=416, help="image width")
 parser.add_argument("--depth-size-ratio", type=int, default=1, help="will divide depth size by that ratio")
-parser.add_argument("--num-threads", type=int, default=4, help="number of threads to use")
+parser.add_argument("--num-threads", type=int, default=8, help="number of threads to use")
 
 args = parser.parse_args()
-
+global data_loader
 if args.dataset_format == 'kitti':
-    from kitti_raw_loader import KittiRawLoader
-    data_loader = KittiRawLoader(args.dataset_dir, static_frames_file=args.static_frames,
+    from DataFlow.kitti_raw_loader import KittiRawLoader
+
+    data_loader = KittiRawLoader(args.dataset_dir,
+                                 static_frames_file=args.static_frames,
                                  img_height=args.height,
                                  img_width=args.width,
                                  get_depth=args.with_depth,
@@ -37,12 +39,14 @@ if args.dataset_format == 'kitti':
                                  depth_size_ratio=args.depth_size_ratio)
 
 if args.dataset_format == 'cityscapes':
-    from cityscapes_loader import cityscapes_loader
-    data_loader = cityscapes_loader(args.dataset_dir, img_height=args.height, img_width=args.width)
+    from DataFlow.cityscapes_loader import cityscapes_loader
+
+    data_loader = cityscapes_loader(args.dataset_dir,
+                                    img_height=args.height,
+                                    img_width=args.width)
 
 
 def dump_example(args, scene):
-    global data_loader
     scene_list = data_loader.collect_scenes(scene)
     for scene_data in scene_list:
         dump_dir = args.dump_root/scene_data['rel_path']
@@ -74,24 +78,6 @@ def dump_example(args, scene):
 def main():
     args.dump_root = Path(args.dump_root)
     args.dump_root.mkdir_p()
-
-    global data_loader
-
-    # if args.dataset_format == 'kitti':
-    #     from kitti_raw_loader import KittiRawLoader
-    #     data_loader = KittiRawLoader(args.dataset_dir,
-    #                                  static_frames_file=args.static_frames,
-    #                                  img_height=args.height,
-    #                                  img_width=args.width,
-    #                                  get_depth=args.with_depth,
-    #                                  get_pose=args.with_pose,
-    #                                  depth_size_ratio=args.depth_size_ratio)
-    #
-    # if args.dataset_format == 'cityscapes':
-    #     from cityscapes_loader import cityscapes_loader
-    #     data_loader = cityscapes_loader(args.dataset_dir,
-    #                                     img_height=args.height,
-    #                                     img_width=args.width)
 
     n_scenes = len(data_loader.scenes)
     print('Found {} potential scenes'.format(n_scenes))

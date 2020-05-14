@@ -4,9 +4,9 @@ import zipfile
 # 首先引入需要的工具包
 # shutil为后期移动文件所需，可以忽略此项
 # 源路径
-parent_path = r'I:/EvisionNet/DataFlow/KITTI/KittiRaw_zip/2011_10_03'
+parent_path = r'G:/KittiRaw_zip/2011_10_03'
 # 目标路径
-target_path = r'I:/EvisionNet/DataFlow/KITTI/KittiRaw/2011_10_03'
+target_path = r'H:/KittiRaw/2011_10_03'
 # 文件类型选择
 # 可以自行更改压缩文件类型，需要引入其它工具包，如tarfile等
 # 这里是因为在自己的windows上，zip比较常见，其他类型请自行更改
