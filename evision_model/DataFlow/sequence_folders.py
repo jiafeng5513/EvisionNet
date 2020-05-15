@@ -31,34 +31,31 @@ class SequenceFolder(data.Dataset):
         self.crawl_folders(sequence_length)
 
     def crawl_folders(self, sequence_length):
-        sequence_set = []
+        sequence_set = []  # 把所有的图片组织称样本序列,存到这个里面
         demi_length = (sequence_length-1)//2
         shifts = list(range(-demi_length, demi_length + 1))
         shifts.pop(demi_length)
-        for scene in self.scenes:
+        for scene in self.scenes:  # 每个场景有自己的内参
             intrinsics = np.genfromtxt(scene/'cam.txt').astype(np.float32).reshape((3, 3))
-            imgs = sorted(scene.files('*.jpg'))
-            if len(imgs) < sequence_length:
+            imgs = sorted(scene.files('*.jpg'))  # 场景中所有的图片
+            if len(imgs) < sequence_length:  # 如果这个场景的素有图片装不满一个样本,只能跳过这个场景
                 continue
-            for i in range(demi_length, len(imgs)-demi_length):
-                sample = {'intrinsics': intrinsics, 'tgt': imgs[i], 'ref_imgs': []}
-                for j in shifts:
-                    sample['ref_imgs'].append(imgs[i+j])
+            for i in range(len(imgs)-sequence_length+1):
+                sample = {'intrinsics': intrinsics, 'imgs':  []}
+                for j in range(sequence_length):
+                    sample['imgs'].append(imgs[i+j])
                 sequence_set.append(sample)
         random.shuffle(sequence_set)
         self.samples = sequence_set
 
     def __getitem__(self, index):
         sample = self.samples[index]
-        tgt_img = load_as_float(sample['tgt'])
-        ref_imgs = [load_as_float(ref_img) for ref_img in sample['ref_imgs']]
+        imgs = [load_as_float(img) for img in sample['imgs']]
         if self.transform is not None:
-            imgs, intrinsics = self.transform([tgt_img] + ref_imgs, np.copy(sample['intrinsics']))
-            tgt_img = imgs[0]
-            ref_imgs = imgs[1:]
+            imgs, intrinsics = self.transform(imgs, np.copy(sample['intrinsics']))
         else:
             intrinsics = np.copy(sample['intrinsics'])
-        return tgt_img, ref_imgs, intrinsics, np.linalg.inv(intrinsics)
+        return imgs, intrinsics
 
     def __len__(self):
         return len(self.samples)

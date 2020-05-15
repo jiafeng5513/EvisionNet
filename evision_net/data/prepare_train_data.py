@@ -19,7 +19,7 @@ parser.add_argument("--with-pose", action='store_true',
                     help="If available (e.g. with KITTI), will store pose ground truth along with images, for validation")
 parser.add_argument("--no-train-gt", action='store_true',
                     help="If selected, will delete ground truth depth to save space")
-parser.add_argument("--dump-root", type=str, default='dump', help="Where to dump the DataFlow")
+parser.add_argument("--dump-root", type=str, default='dump', help="Where to dump the data")
 parser.add_argument("--height", type=int, default=128, help="image height")
 parser.add_argument("--width", type=int, default=416, help="image width")
 parser.add_argument("--depth-size-ratio", type=int, default=1, help="will divide depth size by that ratio")
@@ -111,7 +111,7 @@ def main():
 
     print('Generating train val lists')
     np.random.seed(8964)
-    # to avoid DataFlow snooping, we will make two cameras of the same scene to fall in the same set, train or val
+    # to avoid data snooping, we will make two cameras of the same scene to fall in the same set, train or val
     subdirs = args.dump_root.dirs()
     canonic_prefixes = set([subdir.basename()[:-2] for subdir in subdirs])
     with open(args.dump_root / 'train.txt', 'w') as tf:

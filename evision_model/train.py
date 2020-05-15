@@ -193,7 +193,7 @@ def train(args, train_loader, depth_net, motion_net, optimizer, epoch_size, loss
     train_pbar.set_description('Train: Total Loss=#.####(#.####)')
     train_pbar.set_postfix_str('<TIME: op=#.###(#.###) DataFlow=#.###(#.###)>')
     """============ 3. 开始训练这一个epoch的数据============"""
-    for i, (imgs, obj_masks, gt_intrinsics) in enumerate(train_loader):
+    for i, (imgs,  gt_intrinsics) in enumerate(train_loader):
         log_losses = i > 0 and n_iter % args.print_freq == 0
         log_output = args.training_output_freq > 0 and n_iter % args.training_output_freq == 0
 
@@ -201,7 +201,6 @@ def train(args, train_loader, depth_net, motion_net, optimizer, epoch_size, loss
         data_time.update(time.time() - end)
         """======3.2 传输数据到计算设备======"""
         imgs = imgs.to(device)  # list of [B,3,h,w], list length = SEQ_LENGTH
-        obj_masks = obj_masks.to(device)  # list of [B,1,h,w], list length = SEQ_LENGTH
         gt_intrinsics = gt_intrinsics.to(device)  # [3,3]
         """======3.3 计算网络模型的输出======"""
         depth_pred_list = []
@@ -247,15 +246,16 @@ def train(args, train_loader, depth_net, motion_net, optimizer, epoch_size, loss
         intrinsic_pred = intrinsic_pred / (args.SEQ_LENGTH - 1)
         """======3.4 计算损失======"""
         if args.intri_pred:
+            # last None for obj_mask,we turn obj_mask off
             total_loss = loss_calculator.getTotalLoss(imgs, depth_pred_list,
                                                       trans_pred_list, trans_res_pred_list, rot_pred_list,
                                                       inv_trans_pred_list, inv_trans_res_pred_list, inv_rot_pred_list,
-                                                      intrinsic_pred, obj_masks)
+                                                      intrinsic_pred, None)
         else:
             total_loss = loss_calculator.getTotalLoss(imgs, depth_pred_list,
                                                       trans_pred_list, trans_res_pred_list, rot_pred_list,
                                                       inv_trans_pred_list, inv_trans_res_pred_list, inv_rot_pred_list,
-                                                      gt_intrinsics, obj_masks)
+                                                      gt_intrinsics, None)
 
         # record loss and EPE
         losses.update(total_loss.item(), args.batch_size)

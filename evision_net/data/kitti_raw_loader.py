@@ -71,7 +71,7 @@ def read_calib_file(path):
                 try:
                     data[key] = np.array(list(map(float, value.split(' '))))
                 except ValueError:
-                    # casting error: DataFlow[key] already eq. value, so pass
+                    # casting error: data[key] already eq. value, so pass
                     pass
 
     return data
@@ -140,7 +140,7 @@ class KittiRawLoader(object):
     def collect_scenes(self, drive):
         train_scenes = []
         for c in self.cam_ids:
-            oxts = sorted((drive/'oxts'/'DataFlow').files('*.txt'))
+            oxts = sorted((drive/'oxts'/'data').files('*.txt'))
             scene_data = {'cid': c, 'dir': drive, 'speed': [], 'frame_id': [], 'pose':[], 'rel_path': drive.name + '_' + c}
             scale = None
             origin = None
@@ -215,7 +215,7 @@ class KittiRawLoader(object):
         return P_rect
 
     def load_image(self, scene_data, tgt_idx):
-        img_file = scene_data['dir']/'image_{}'.format(scene_data['cid'])/'DataFlow'/scene_data['frame_id'][tgt_idx]+'.png'
+        img_file = scene_data['dir']/'image_{}'.format(scene_data['cid'])/'data'/scene_data['frame_id'][tgt_idx]+'.png'
         if not img_file.isfile():
             return None
         img = scipy.misc.imread(img_file)
@@ -262,10 +262,10 @@ class KittiRawLoader(object):
 
         P_velo2im = np.dot(np.dot(P_rect, R_cam2rect), velo2cam)
 
-        velo_file_name = scene_data['dir']/'velodyne_points'/'DataFlow'/'{}.bin'.format(scene_data['frame_id'][tgt_idx])
+        velo_file_name = scene_data['dir']/'velodyne_points'/'data'/'{}.bin'.format(scene_data['frame_id'][tgt_idx])
 
         # load velodyne points and remove all behind image plane (approximation)
-        # each row of the velodyne DataFlow is forward, left, up, reflectance
+        # each row of the velodyne data is forward, left, up, reflectance
         velo = np.fromfile(velo_file_name, dtype=np.float32).reshape(-1, 4)
         velo[:,3] = 1
         velo = velo[velo[:, 0] >= 0, :]
