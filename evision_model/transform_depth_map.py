@@ -4,7 +4,7 @@
 
 import torch
 import transform_utils
-
+import numpy as np
 
 class TransformedDepthMap(object):
     """
@@ -43,7 +43,7 @@ class TransformedDepthMap(object):
             for j in range(i):
                 tensor_i = self.__dict__[attrs[i]]
                 tensor_j = self.__dict__[attrs[j]]
-                if not tensor_i.shape.is_compatible_with(tensor_j.shape):
+                if not tensor_i.shape == tensor_j.shape:
                     raise ValueError('All tensors in TransformedDepthMap\'s constructor must have compatible shapes, '
                                      'however \'%s\' and \'%s\' have the incompatible shapes %s and %s.' %
                                      (attrs[i][1:], attrs[j][1:], tensor_i.shape, tensor_j.shape))
@@ -101,14 +101,15 @@ def _using_motion_vector(depth, translation, rotation_angles, intrinsic_mat):
 
     if len(translation.shape) not in (2, 4):
         raise ValueError('\'translation\' should have rank 2 or 4, not %d' % len(translation.shape))
-    if translation.shape[1] != 3:
+    if translation.shape[-1] != 3:
         raise ValueError('translation\'s channel dimension should be 3, not %d' % translation.shape[1])
     if len(translation.shape) == 2:
         translation = torch.unsqueeze(torch.unsqueeze(translation, -1), -1)
 
-    _, height, width = depth.shape
-    grid = torch.stack(torch.meshgrid(torch.range(begin=0,end=width), torch.range(begin=0,end=height)))
-    grid = grid.float()
+    _, _, height, width = depth.shape
+    lista, listb = np.meshgrid(np.arange(width), np.arange(height))
+    listc = np.ones_like(listb)
+    grid = torch.Tensor([lista, listb, listc]).float().cuda()  # TODO:自适应运算设备
     intrinsic_mat_inv = torch.inverse(intrinsic_mat)
 
     rot_mat = transform_utils.matrix_from_angles(rotation_angles)
@@ -121,14 +122,14 @@ def _using_motion_vector(depth, translation, rotation_angles, intrinsic_mat):
         # the reshaping and invocation of BatchMatMul, instead of doing it manually,
         # as in inverse_warp.
         projected_rotation = torch.einsum('bij,bjk,bkl->bil', intrinsic_mat, rot_mat, intrinsic_mat_inv)  # K*R*inv_K
-        pcoords = torch.einsum('bij,jhw,bhw->bihw', projected_rotation, grid, depth)
+        pcoords = torch.einsum('bij,jhw,bhw->bihw', projected_rotation, grid, depth.squeeze())
     elif len(rotation_angles.shape) == 4:
         # We push the H and W dimensions to the end, and transpose the rotation matrix elements (as noted above).
         rot_mat = rot_mat.permute(0, 3, 4, 1, 2)
         projected_rotation = torch.einsum('bij,bjkhw,bkl->bilhw', intrinsic_mat, rot_mat, intrinsic_mat_inv)
-        pcoords = torch.einsum('bijhw,jhw,bhw->bihw', projected_rotation, grid, depth)
+        pcoords = torch.einsum('bijhw,jhw,bhw->bihw', projected_rotation, grid, depth.squeeze())
 
-    projected_translation = torch.einsum('bij,bhwj->bihw', intrinsic_mat, translation)  # Kt
+    projected_translation = torch.einsum('bij,bhwj->bihw', intrinsic_mat, translation)  # Kt [4,3,3] [4,128,416,3]
     pcoords += projected_translation
     x, y, z = torch.unbind(pcoords, axis=1)
     return x / z, y / z, z

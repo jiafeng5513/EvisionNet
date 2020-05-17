@@ -147,7 +147,7 @@ class LossFactory(object):
                 self.__Depth_Consistency_Loss(transformed_depth_j, image_stack[i + 1], depth_pred[i], image_stack[i])
 
             _rot_loss_j, _trans_loss_j = self.__Cyclic_Consistency_Loss(transformed_depth_j.pixel_xy, mask_j, rot[i],
-                                                                        trans[i], inv_rot[i], inv_trans[i])
+                                                                        _trans, inv_rot[i], _inv_trans)
             # ---------------------[j-->i]-------------------------#
             transformed_depth_i = transform_depth_map.using_motion_vector(depth_pred[i], _inv_trans, inv_rot[i],
                                                                           intrinsic_mat)
@@ -158,7 +158,7 @@ class LossFactory(object):
 
             _rot_loss_i, _trans_loss_i = self.__Cyclic_Consistency_Loss(transformed_depth_i.pixel_xy, mask_i,
                                                                         inv_rot[i],
-                                                                        inv_trans[i], rot[i], trans[i])
+                                                                        _inv_trans, rot[i], _trans)
             # -----------------------累加--------------------------#
             _depth_consistency_loss += (_depth_consistency_loss_j + _depth_consistency_loss_i)
             _rgb_loss += (_rgb_loss_j + _rgb_loss_i)
@@ -190,7 +190,7 @@ class LossFactory(object):
         """
         disp = 1.0 / depth
         # Perform depth normalization, dividing by the mean.
-        mean_disp = torch.mean(disp, axis=[1, 2, 3], keep_dims=True)
+        mean_disp = torch.mean(disp, dim=(1, 2, 3), keepdim=True)
         disp_input = disp / mean_disp
         # Computes image-aware depth smoothness loss.
         depth_dx = disp_input[:, :, :, :-1] - disp_input[:, :, :, 1:]
@@ -206,7 +206,7 @@ class LossFactory(object):
 
     # private : 2.背景平移场平滑损失
     def __Motion_field_smoothness(self, motion_map):
-        norm = torch.mean(motion_map.mul(motion_map), dim=[1, 2, 3], keep_dims=True) * 3.0
+        norm = torch.mean(motion_map.mul(motion_map), dim=(1, 2, 3), keepdim=True) * 3.0
         motion_map /= torch.sqrt(norm + 1e-12)
 
         """Calculates L1 (total variation) smoothness loss of a tensor.
@@ -251,14 +251,14 @@ class LossFactory(object):
                   frame1_closer_to_camera: 一个张量 [B, H, W, 1], frame 1 的深度值比frame 2小的位置为1
             """
         pixel_xy = frame1transformed_depth.pixel_xy
-        frame2depth_resampled = torch.squeeze(resample(torch.unsqueeze(frame2depth, 1), pixel_xy), dim=1)
+        frame2depth_resampled = torch.squeeze(resample(frame2depth, pixel_xy), dim=1)
         frame2rgb_resampled = resample(frame2rgb, pixel_xy)
 
         frame1_closer_to_camera = frame1transformed_depth.mask.mul(torch.le(frame1transformed_depth.depth,
                                                                             frame2depth_resampled)).float()
         depth_error = (
                     torch.abs(frame2depth_resampled - frame1transformed_depth.depth) * frame1_closer_to_camera).mean()
-        rgb_error = (torch.abs(frame2rgb_resampled - frame1rgb) * torch.unsqueeze(frame1_closer_to_camera, -1))
+        rgb_error = (torch.abs(frame2rgb_resampled - frame1rgb) * torch.unsqueeze(frame1_closer_to_camera, 1))
         rgb_error = rgb_error.mean()
 
         def _weighted_average(x, w, epsilon=1.0):
@@ -270,8 +270,9 @@ class LossFactory(object):
 
         depth_error_second_moment = _weighted_average((frame2depth_resampled - frame1transformed_depth.depth).pow(2),
                                                       frame1_closer_to_camera) + 1e-4
+
         depth_proximity_weight = (
-                depth_error_second_moment((frame2depth_resampled - frame1transformed_depth.depth).pow(2) +
+                depth_error_second_moment/((frame2depth_resampled - frame1transformed_depth.depth).pow(2) +
                                           depth_error_second_moment) * frame1transformed_depth.mask.float())
         ssim_error, avg_weight = self.__weighted_ssim(frame2rgb_resampled,
                                                       frame1rgb,
@@ -305,13 +306,13 @@ class LossFactory(object):
              rotation_error: A tf scalar, the rotation consistency error.
              translation_error: A tf scalar, the translation consistency error.
          """
-
-        translation2resampled = resample(translation2, frame1transformed_depth_pixelxy)  # stop_gradient
+        translation2resampled = resample(translation2.permute(0, 3, 1, 2), frame1transformed_depth_pixelxy)  # stop_gradient
+        translation2resampled = translation2resampled.permute(0, 2, 3, 1)
 
         def _expand_dims_twice(x, dim):
             return torch.unsqueeze(torch.unsqueeze(x, dim), dim)
 
-        rotation1field, _ = torch.broadcast_tensors(_expand_dims_twice(rotation1, -2), translation1)
+        rotation1field, _ = torch.broadcast_tensors(_expand_dims_twice(rotation1, -2), translation1)  # translation1 [4,128,416,3]
         rotation2field, _ = torch.broadcast_tensors(_expand_dims_twice(rotation2, -2), translation2)
         rotation1matrix = transform_utils.matrix_from_angles(rotation1field)
         rotation2matrix = transform_utils.matrix_from_angles(rotation2field)

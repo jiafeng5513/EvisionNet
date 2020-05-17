@@ -155,6 +155,9 @@ class MotionNet(nn.Module):
         # translation : [b,3,1,1]
         # residual_translation : [b,3,h,w]
         # intrinsic_mat : [b,3,3]
+        # 为了方便后续计算,把平移向量和平移场的shape顺序进行调换
+        translation = translation.permute(0, 2, 3, 1)  # [b, 1, 1, 3]
+        residual_translation = residual_translation.permute(0, 2, 3, 1)  # [b, h, w, 3]
         if self.intrinsic_pred:
             return (rotation, translation, residual_translation, intrinsic_mat)
         else:

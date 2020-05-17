@@ -33,8 +33,9 @@ Returns:
     m21 = sx * cy
     m22 = cx * cy
     matrix = torch.stack((m00, m01, m02, m10, m11, m12, m20, m21, m22), dim=-1)  # pyformat: disable
-    output_shape = torch.cat((sin_angles.shape[:-1], (3, 3)), dim=-1)
-    return matrix.reshape(output_shape)
+    #output_shape = torch.cat((sin_angles.shape[:-1], (3, 3)), dim=-1)
+    shape = sin_angles.shape[:-1] + (3, 3)
+    return matrix.reshape(shape)
 
 
 def from_euler(angles):
@@ -60,7 +61,7 @@ def from_euler(angles):
     ValueError: If the shape of `angles` is not supported.
   """
 
-    angles = torch.Tensor(angles)
+    #angles = torch.Tensor(angles)
     # shape.check_static(tensor=angles, tensor_name="angles", has_dim_equals=(-1, 3))
     sin_angles = torch.sin(angles)
     cos_angles = torch.cos(angles)
@@ -82,8 +83,8 @@ def matrix_from_angles(rot):
     """
     rank = len(rot.shape)
     # Swap the two last dimensions
-    perm = torch.cat([torch.range(start=0, end=rank - 1), [rank], [rank - 1]], axis=0)
-    return from_euler(-rot).permute(perm)
+    perm = torch.cat([torch.arange(start=0, end=rank-1), torch.tensor([rank]), torch.tensor([rank - 1])], axis=0)
+    return from_euler(-rot).permute(tuple(perm.numpy()))
 
 
 def invert_rot_and_trans(rot, trans):

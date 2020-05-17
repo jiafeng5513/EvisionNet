@@ -25,16 +25,17 @@ from LossFunction import LossFactory
 """命令行参数"""
 parser = argparse.ArgumentParser(description='EvisionNet', formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 """程序参数"""
+parser.add_argument('data', metavar='path to KittiRaw_formatted', help='预处理后的数据集路径')
 parser.add_argument('--dataset-format', default='sequential', metavar='STR',
                     help='数据格式, stacked:在彩色通道堆叠;sequential:在width方向;连接')
-parser.add_argument('DataFlow', metavar='path to KittiRaw_formatted', help='预处理后的数据集路径')
 parser.add_argument('--with-gt', action='store_true', help='验证时是否使用GT,若要使用,在数据准备时需要使用--with-depth')
 parser.add_argument('--pretrained-depthnet', dest='pretrained_depth', default=None, metavar='PATH',
                     help='预训练DepthNet的路径')
 parser.add_argument('--pretrained-motionnet', dest='pretrained_motion', default=None, metavar='PATH',
                     help='预训练MotionNet的路径')
+parser.add_argument('-j', '--workers', default=4, type=int, metavar='N', help='数据加载线程数')
 """超参数"""
-parser.add_argument('--SEQ_LENGTH', type=int, metavar='N', help='每个训练样本由几帧构成', default=3)
+parser.add_argument('--SEQ_LENGTH', default=3, type=int, metavar='N', help='每个训练样本由几帧构成')
 parser.add_argument('--lr', '--learning_rate', default=1e-4, type=float, metavar='LR', help='学习率')
 parser.add_argument('--batch_size', default=4, type=int, help='batch size')
 parser.add_argument('--epoch-size', default=3000, type=int, metavar='N', help='手动设置每个epoch的样本数量')
@@ -93,9 +94,9 @@ def main():
                                                  custom_transforms.ArrayToTensor(), normalize])
     valid_transform = custom_transforms.Compose([custom_transforms.ArrayToTensor(), normalize])
     # 训练集
-    print("=> fetching DataFlow from '{}'".format(args.data))
+    print("=> fetching data from '{}'".format(args.data))
     train_set = SequenceFolder(args.data, transform=train_transform, seed=args.seed, train=True,
-                               sequence_length=args.sequence_length)
+                               sequence_length=args.SEQ_LENGTH)
     # 验证集
     val_set = ValidationSet(args.data, transform=valid_transform)
 
@@ -117,15 +118,13 @@ def main():
         print("=> using pre-trained weights for DepthNet")
         weights = torch.load(args.pretrained_depth)
         depth_net.load_state_dict(weights['state_dict'], strict=False)
-    else:
-        depth_net.init_weights()
+
 
     if args.pretrained_motion:
         print("=> using pre-trained weights for MotionNet")
         weights = torch.load(args.pretrained_motion)
         motion_net.load_state_dict(weights['state_dict'])
-    else:
-        motion_net.init_weights()
+
 
     cudnn.benchmark = True
     depth_net = torch.nn.DataParallel(depth_net)
@@ -191,7 +190,7 @@ def train(args, train_loader, depth_net, motion_net, optimizer, epoch_size, loss
     train_pbar = tqdm(total=min(len(train_loader), args.epoch_size),
                       bar_format='{desc} {percentage:3.0f}%|{bar}| {postfix}')
     train_pbar.set_description('Train: Total Loss=#.####(#.####)')
-    train_pbar.set_postfix_str('<TIME: op=#.###(#.###) DataFlow=#.###(#.###)>')
+    train_pbar.set_postfix_str('<TIME: op=#.###(#.###) data=#.###(#.###)>')
     """============ 3. 开始训练这一个epoch的数据============"""
     for i, (imgs,  gt_intrinsics) in enumerate(train_loader):
         log_losses = i > 0 and n_iter % args.print_freq == 0
@@ -200,7 +199,8 @@ def train(args, train_loader, depth_net, motion_net, optimizer, epoch_size, loss
         """======3.1 计时======"""
         data_time.update(time.time() - end)
         """======3.2 传输数据到计算设备======"""
-        imgs = imgs.to(device)  # list of [B,3,h,w], list length = SEQ_LENGTH
+        #imgs = imgs.to(device)  # list of [B,3,h,w], list length = SEQ_LENGTH
+        imgs = [img.to(device) for img in imgs]
         gt_intrinsics = gt_intrinsics.to(device)  # [3,3]
         """======3.3 计算网络模型的输出======"""
         depth_pred_list = []
@@ -212,7 +212,7 @@ def train(args, train_loader, depth_net, motion_net, optimizer, epoch_size, loss
         inv_trans_pred_list = []
         trans_res_pred_list = []
         inv_trans_res_pred_list = []
-        intrinsic_pred = torch.zeros(3, 3)
+        intrinsic_pred = torch.zeros(3, 3).repeat(4, 1, 1).to(device)
         for j in range(args.SEQ_LENGTH - 1):
             a = j
             b = j + 1
@@ -272,7 +272,7 @@ def train(args, train_loader, depth_net, motion_net, optimizer, epoch_size, loss
         train_pbar.clear()
         train_pbar.update(1)
         train_pbar.set_description('Train: Total Loss={}'.format(losses))
-        train_pbar.set_postfix_str('<TIME: op={} DataFlow={}>'.format(batch_time, data_time))
+        train_pbar.set_postfix_str('<TIME: op={} data={}>'.format(batch_time, data_time))
         if i >= epoch_size - 1:
             break
 
@@ -366,20 +366,15 @@ def save_path_formatter(args, parser):
         return value == parser.get_default(key)
 
     args_dict = vars(args)
-    data_folder_name = str(Path(args_dict['DataFlow']).normpath().name)
+    data_folder_name = str(Path(args_dict['data']).normpath().name)
     folder_string = [data_folder_name]
     if not is_default('epochs', args_dict['epochs']):
         folder_string.append('{}epochs'.format(args_dict['epochs']))
     keys_with_prefix = OrderedDict()
     keys_with_prefix['epoch_size'] = 'epoch_size'
-    keys_with_prefix['sequence_length'] = 'seq'
-    keys_with_prefix['rotation_mode'] = 'rot_'
-    keys_with_prefix['padding_mode'] = 'padding_'
+    keys_with_prefix['SEQ_LENGTH'] = 'seq'
     keys_with_prefix['batch_size'] = 'b'
     keys_with_prefix['lr'] = 'lr'
-    keys_with_prefix['photo_loss_weight'] = 'p'
-    keys_with_prefix['mask_loss_weight'] = 'm'
-    keys_with_prefix['smooth_loss_weight'] = 's'
 
     for key, prefix in keys_with_prefix.items():
         value = args_dict[key]
@@ -432,3 +427,8 @@ class AverageMeter(object):
         val = ' '.join(['{:.{}f}'.format(v, self.precision) for v in self.val])
         avg = ' '.join(['{:.{}f}'.format(a, self.precision) for a in self.avg])
         return '{}({})'.format(val, avg)
+
+
+if __name__ == '__main__':
+    main()
+    pass

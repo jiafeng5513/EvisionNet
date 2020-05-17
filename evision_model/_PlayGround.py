@@ -28,6 +28,7 @@ def pytorch_test_template():
     # function to be test
     pass
 
+
 def dataflow_test():
     from DataFlow.sequence_folders import SequenceFolder
     import custom_transforms
@@ -52,11 +53,57 @@ def dataflow_test():
     print(len(imgs))
     print(intrinsics.shape)
 
+    pass
 
+
+def tf_grid():
+    grid = tf.squeeze(tf.stack(tf.meshgrid(tf.range(4), tf.range(3), (1,))), axis=3)
+    initialize_op = tf.global_variables_initializer()
+    sess = tf.Session()
+    sess.run(initialize_op)
+
+    r = sess.run(grid)
+    print(grid.shape)  # (3, 3, 4)
+    print(r)
+    """
+    [4,3,3] [3,128,416] []
+    [[[0 1 2 3] [0 1 2 3] [0 1 2 3]]
+     [[0 0 0 0] [1 1 1 1] [2 2 2 2]]
+     [[1 1 1 1] [1 1 1 1] [1 1 1 1]]]
+    """
+    pass
+
+
+def torch_grid():
+    grid = torch.stack(torch.meshgrid(torch.arange(start=0, end=4), torch.arange(start=0, end=3)))
+    print(grid)
+    """
+    [[[0, 0, 0], [1, 1, 1], [2, 2, 2], [3, 3, 3]],
+     [[0, 1, 2], [0, 1, 2], [0, 1, 2], [0, 1, 2]]])
+    """
+    pass
+
+
+def tf_perm():
+    rank = 4
+    perm = tf.concat([tf.range(rank - 1), [rank], [rank - 1]], axis=0)
+    initialize_op = tf.global_variables_initializer()
+    sess = tf.Session()
+    sess.run(initialize_op)
+
+    r = sess.run(perm)
+    print(perm.shape)
+    print(r)
     pass
 
 
 if __name__ == '__main__':
-    # batch_eye_tf()
-    dataflow_test()
+    # tf_perm()
+    a = torch.randn(4, 128, 416, 3, 3)
+    x = torch.randn(4, 128, 416, 3, 3)
+    x.permute()
+    y = torch.matmul(a, x)
+
+    print(y.shape)
+
     pass
