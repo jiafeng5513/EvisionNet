@@ -320,7 +320,8 @@ class LossFactory(object):
         rot_unit, trans_zero = transform_utils.combine(rotation2matrix, translation2resampled,
                                                        rotation1matrix, translation1)
 
-        eye = torch.eye(3).unsqueeze(0).repeat(rot_unit.shape[0], 1, 1)
+        eye_shape = rot_unit.shape[:-2] + (1, 1)
+        eye = torch.eye(3).unsqueeze(0).repeat(eye_shape).cuda()  # TODO:自适应运算设备
 
         transform_utils.matrix_from_angles(rotation1field)  # Delete this later
         transform_utils.matrix_from_angles(rotation2field)  # Delete this later
@@ -329,7 +330,7 @@ class LossFactory(object):
         # the loss agnostic of their magnitudes, only wanting them to be opposite in
         # directions. Otherwise the loss has a tendency to drive the rotations to
         # zero.
-        rot_error = torch.mean((rot_unit - eye).pow(2), dim=(2, 4))
+        rot_error = torch.mean((rot_unit - eye).pow(2), dim=(3, 4))
         rot1_scale = torch.mean((rotation1matrix - eye).pow(2), dim=(3, 4))
         rot2_scale = torch.mean((rotation2matrix - eye).pow(2), dim=(3, 4))
         rot_error /= (1e-24 + rot1_scale + rot2_scale)
