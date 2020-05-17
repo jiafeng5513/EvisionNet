@@ -156,24 +156,34 @@ class MotionNet(nn.Module):
         # residual_translation : [b,3,h,w]
         # intrinsic_mat : [b,3,3]
         # 为了方便后续计算,把平移向量和平移场的shape顺序进行调换
-        translation = translation.permute(0, 2, 3, 1)  # [b, 1, 1, 3]
-        residual_translation = residual_translation.permute(0, 2, 3, 1)  # [b, h, w, 3]
+        # [b, 1, 1, 3]
+        # [b, h, w, 3]
         if self.intrinsic_pred:
-            return (rotation, translation, residual_translation, intrinsic_mat)
+            return (rotation, translation.permute(0, 2, 3, 1), residual_translation.permute(0, 2, 3, 1), intrinsic_mat)
         else:
-            return (rotation, translation, residual_translation)
+            return (rotation, translation.permute(0, 2, 3, 1), residual_translation.permute(0, 2, 3, 1))
 
 
 if __name__ == '__main__':
 
     model = MotionNet()
     model = model.cuda()
-    model.eval()
+    model.train()
 
     image = torch.randn(4, 6, 128, 416)  # 输入尺寸 [N C H W]
     image = image.cuda()
-    with torch.no_grad():
-        rotation, translation, residual_translation, intrinsic_mat = model(image)
+
+    rotation, translation, residual_translation, intrinsic_mat = model(image)
+
+    optim_params = [{'params': model.parameters(), 'lr': 0.1}]
+
+    optimizer = torch.optim.Adam(optim_params, betas=(0.9, 0.999), weight_decay=0)
+
+    total_loss = rotation.mean()+translation.mean()+residual_translation.mean()+intrinsic_mat.mean()
+
+    optimizer.zero_grad()
+    total_loss.backward()
+    optimizer.step()
 
     print(rotation.shape)
     print(translation.shape)

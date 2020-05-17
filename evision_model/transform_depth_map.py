@@ -131,7 +131,7 @@ def _using_motion_vector(depth, translation, rotation_angles, intrinsic_mat):
 
     projected_translation = torch.einsum('bij,bhwj->bihw', intrinsic_mat, translation)  # Kt [4,3,3] [4,128,416,3]
     pcoords += projected_translation
-    x, y, z = torch.unbind(pcoords, axis=1)
+    x, y, z = torch.unbind(pcoords, dim=1)
     return x / z, y / z, z
 
 
@@ -220,8 +220,8 @@ def _clamp_and_filter_result(pixel_x, pixel_y, z):
 
     x_not_underflow = pixel_x >= 0.0
     y_not_underflow = pixel_y >= 0.0
-    x_not_overflow = pixel_x < _tensor(width - 1)
-    y_not_overflow = pixel_y < _tensor(height - 1)
+    x_not_overflow = pixel_x < _tensor(width - 1).cuda()
+    y_not_overflow = pixel_y < _tensor(height - 1).cuda()
     z_positive = z > 0.0
     x_not_nan = torch.logical_not(torch.isnan(pixel_x))
     y_not_nan = torch.logical_not(torch.isnan(pixel_y))

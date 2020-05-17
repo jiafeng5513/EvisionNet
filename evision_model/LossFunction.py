@@ -91,7 +91,7 @@ class LossFactory(object):
         self.motion_smoothing_weight = motion_smoothing_weight
         self.rotation_consistency_weight = rotation_consistency_weight
         self.translation_consistency_weight = translation_consistency_weight
-        self.depth_consistency_loss_weight = depth_consistency_loss_weight,
+        self.depth_consistency_loss_weight = depth_consistency_loss_weight
         pass
 
     # public : 联合损失
@@ -197,8 +197,8 @@ class LossFactory(object):
         depth_dy = disp_input[:, :, :-1, :] - disp_input[:, :, 1:, :]
         image_dx = image[:, :, :, :-1] - image[:, :, :, 1:]
         image_dy = image[:, :, :-1, :] - image[:, :, 1:, :]
-        weights_x = torch.exp(-torch.mean(torch.abs(image_dx), 1, keepdims=True))
-        weights_y = torch.exp(-torch.mean(torch.abs(image_dy), 1, keepdims=True))
+        weights_x = torch.exp(-torch.mean(torch.abs(image_dx), 1, keepdim=True))
+        weights_y = torch.exp(-torch.mean(torch.abs(image_dy), 1, keepdim=True))
         smoothness_x = depth_dx * weights_x
         smoothness_y = depth_dy * weights_y
         smooth_loss = torch.mean(abs(smoothness_x)) + torch.mean(abs(smoothness_y))
@@ -206,8 +206,8 @@ class LossFactory(object):
 
     # private : 2.背景平移场平滑损失
     def __Motion_field_smoothness(self, motion_map):
-        norm = torch.mean(motion_map.mul(motion_map), dim=(1, 2, 3), keepdim=True) * 3.0
-        motion_map /= torch.sqrt(norm + 1e-12)
+        norm = torch.mean(motion_map.pow(2), dim=(1, 2, 3), keepdim=True) * 3.0
+        motion_map_p = motion_map/torch.sqrt(norm + 1e-12)
 
         """Calculates L1 (total variation) smoothness loss of a tensor.
 
@@ -222,9 +222,9 @@ class LossFactory(object):
         # translation maps. We would like to discourage spatial gradients of the
         # translation field, and to absorb sich gradients into the rotation as much as
         # possible. This is why we impose continuity across the spatial boundary.
-        motion_map_dx = motion_map - torch.roll(motion_map, 1, 1)
-        motion_map_dy = motion_map - torch.roll(motion_map, 1, 2)
-        sm_loss = torch.sqrt(1e-24 + motion_map_dx.mul(motion_map_dx) + motion_map_dy.mul(motion_map_dy))
+        motion_map_dx = motion_map_p - torch.roll(motion_map_p, 1, 1)
+        motion_map_dy = motion_map_p - torch.roll(motion_map_p, 1, 2)
+        sm_loss = torch.sqrt(1e-24 + motion_map_dx.pow(2) + motion_map_dy.pow(2))
 
         return torch.mean(sm_loss)
 
@@ -306,8 +306,8 @@ class LossFactory(object):
              rotation_error: A tf scalar, the rotation consistency error.
              translation_error: A tf scalar, the translation consistency error.
          """
-        translation2resampled = resample(translation2.permute(0, 3, 1, 2), frame1transformed_depth_pixelxy)  # stop_gradient
-        translation2resampled = translation2resampled.permute(0, 2, 3, 1)
+        translation2resampled = resample(translation2.permute(0, 3, 1, 2),
+                                         frame1transformed_depth_pixelxy).permute(0, 2, 3, 1)  # stop_gradient
 
         def _expand_dims_twice(x, dim):
             return torch.unsqueeze(torch.unsqueeze(x, dim), dim)

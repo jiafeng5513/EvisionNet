@@ -69,7 +69,7 @@ device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cp
 def main():
     global best_error, n_iter, device
     args = parser.parse_args()
-
+    torch.autograd.set_detect_anomaly(True)  # 启动梯度侦测,用于查找梯度终断
     """====== step 1 : 根据使用的数据类型加载相应的数据流水线  ======"""
     if args.dataset_format == 'stacked':
         from DataFlow.stacked_sequence_folders import SequenceFolder

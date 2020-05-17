@@ -83,7 +83,7 @@ def matrix_from_angles(rot):
     """
     rank = len(rot.shape)
     # Swap the two last dimensions
-    perm = torch.cat([torch.arange(start=0, end=rank-1), torch.tensor([rank]), torch.tensor([rank - 1])], axis=0)
+    perm = torch.cat([torch.arange(start=0, end=rank-1), torch.tensor([rank]), torch.tensor([rank - 1])], dim=0)
     return from_euler(-rot).permute(tuple(perm.numpy()))
 
 
