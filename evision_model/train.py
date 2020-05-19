@@ -283,6 +283,8 @@ def train(args, train_loader, depth_net, motion_net, optimizer, epoch_size, loss
 
 
 # 验证
+# abs_diff : 6.398, abs_rel : 0.416, sq_rel : 4.001, a1 : 0.333, a2 : 0.608, a3 : 0.799
+# 验证结构总是这个,暗示val_loader有问题
 @torch.no_grad()
 def validate_with_gt(args, val_loader, depth_net, motion_net, epoch):
     global device
