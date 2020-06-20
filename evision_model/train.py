@@ -300,14 +300,18 @@ def validate_with_gt(args, val_loader, depth_net, motion_net, epoch):
 
     validate_pbar = tqdm(total=len(val_loader), bar_format='{desc} {percentage:3.0f}%|{bar}| {postfix}')
     validate_pbar.set_description('valid: Abs Error {:.4f} ({:.4f})'.format(0, 0))
-    validate_pbar.set_postfix_str('<Time {}>'.format(0))
+    validate_pbar.set_postfix_str('<Time {} ({})>'.format(0, 0))
 
     for i, (tgt_img, depth) in enumerate(val_loader):
         tgt_img = tgt_img.to(device)
         depth = depth.to(device)
 
         # compute output
-        output_depth = depth_net(tgt_img)
+        with torch.no_grad():
+            output_depth = depth_net(tgt_img)
+            depth0 = output_depth[0,0,:,:]
+            import numpy as np
+            np.save("F:/test.npy", depth0.cpu().numpy())
         errors.update(compute_errors(depth, output_depth))
 
         # measure elapsed time
@@ -325,29 +329,29 @@ def validate_with_gt(args, val_loader, depth_net, motion_net, epoch):
 # 深度指标
 @torch.no_grad()
 def compute_errors(gt, pred, crop=True):
+    """
+    计算深度指标
+    Args:
+        gt:    ground truth [B,128,416]
+        pred:  prediction   [B,1,128,416]
+        crop:
+    Returns:
+        abs_diff, abs_rel, sq_rel, a1, a2, a3
+    """
     abs_diff, abs_rel, sq_rel, a1, a2, a3 = 0, 0, 0, 0, 0, 0
     batch_size = gt.size(0)
 
-    '''
-    crop used by Garg ECCV16 to reprocude Eigen NIPS14 results
-    construct a mask of False values, with the same size as target
-    and then set to True values inside the crop
-    '''
-    if crop:
-        crop_mask = gt[0] != gt[0]
-        y1, y2 = int(0.40810811 * gt.size(1)), int(0.99189189 * gt.size(1))
-        x1, x2 = int(0.03594771 * gt.size(2)), int(0.96405229 * gt.size(2))
-        crop_mask[y1:y2, x1:x2] = 1
+    mask_1 = gt > 0
+    mask_2 = gt <= 80
+    mask = mask_1 * mask_2
+    pred_masked = pred.squeeze() * mask
 
-    for current_gt, current_pred in zip(gt, pred):
-        valid = (current_gt > 0) & (current_gt < 80)
-        if crop:
-            valid = valid & crop_mask
+    for current_gt, current_pred in zip(gt, pred_masked):
+        # 对当前gt做均值方差归一化
+        valid_gt = ((current_gt - current_gt.min()) / (current_gt.max() - current_gt.min())).clamp(1e-3, 1)
+        valid_pred = ((current_pred - current_pred.min()) / (current_pred.max() - current_pred.min())).clamp(1e-3, 1)
 
-        valid_gt = current_gt[valid]
-        valid_pred = current_pred.squeeze()[valid].clamp(1e-3, 80)
-
-        valid_pred = valid_pred * torch.median(valid_gt) / torch.median(valid_pred)
+        valid_pred = valid_pred * torch.median(valid_gt) / torch.median(valid_pred)  # 不明白
 
         thresh = torch.max((valid_gt / valid_pred), (valid_pred / valid_gt))
         a1 += (thresh < 1.25).float().mean()

@@ -33,11 +33,12 @@ def dataflow_test():
     from DataFlow.sequence_folders import SequenceFolder
     import custom_transforms
     from torch.utils.data import DataLoader
-
+    from DataFlow.validation_folders import ValidationSet
     normalize = custom_transforms.Normalize(mean=[0.5, 0.5, 0.5], std=[0.5, 0.5, 0.5])
     train_transform = custom_transforms.Compose([custom_transforms.RandomHorizontalFlip(),
                                                  custom_transforms.RandomScaleCrop(),
                                                  custom_transforms.ArrayToTensor(), normalize])
+    valid_transform = custom_transforms.Compose([custom_transforms.ArrayToTensor(), normalize])
     datapath = 'G:/data/KITTI/KittiRaw_formatted'
     seed = 8964
     train_set = SequenceFolder(datapath, transform=train_transform, seed=seed, train=True,
@@ -46,7 +47,10 @@ def dataflow_test():
     train_loader = DataLoader(train_set, batch_size=4, shuffle=True, num_workers=4,
                               pin_memory=True)
 
+    val_set = ValidationSet(datapath, transform=valid_transform)
     print("length of train loader is %d" % len(train_loader))
+    val_loader = DataLoader(val_set, batch_size=4, shuffle=False, num_workers=4, pin_memory=True)
+    print("length of val loader is %d" % len(val_loader))
 
     dataiter = iter(train_loader)
     imgs, intrinsics = next(dataiter)
@@ -54,8 +58,6 @@ def dataflow_test():
     print(intrinsics.shape)
 
     pass
-
-
 
 
 # 深度指标
@@ -76,12 +78,12 @@ def compute_errors(gt, pred, crop=True):
         crop_mask[y1:y2, x1:x2] = 1
 
     for current_gt, current_pred in zip(gt, pred):
-        valid = (current_gt > 0) & (current_gt < 80)
+        valid = (current_gt > 0) #& (current_gt < 80)
         if crop:
             valid = valid & crop_mask
 
         valid_gt = current_gt[valid]
-        valid_pred = current_pred[valid].clamp(1e-3, 80)
+        valid_pred = current_pred.squeeze()[valid].clamp(1e-3, 80)
 
         valid_pred = valid_pred * torch.median(valid_gt) / torch.median(valid_pred)
 
@@ -97,16 +99,44 @@ def compute_errors(gt, pred, crop=True):
 
     return [metric.item() / batch_size for metric in [abs_diff, abs_rel, sq_rel, a1, a2, a3]]
 
+
 def errors_test():
-    x1 = torch.randn(4, 1, 128, 416)
-    x2 = torch.randn(4, 1, 128, 416)
+    # x1 = torch.randn(4, 128, 416)
+    # x2 = torch.randn(4, 1, 128, 416)
+
+    depth0 = torch.from_numpy(np.load("H:/KittiRaw_prepare/2011_09_26_drive_0001_sync_02/0000000000.npy"))
+    depth1 = torch.from_numpy(np.load("H:/KittiRaw_prepare/2011_09_26_drive_0001_sync_02/0000000001.npy"))
+    depth2 = torch.from_numpy(np.load("H:/KittiRaw_prepare/2011_09_26_drive_0001_sync_02/0000000002.npy"))
+    depth3 = torch.from_numpy(np.load("H:/KittiRaw_prepare/2011_09_26_drive_0001_sync_02/0000000003.npy"))
+
+    x1 = torch.cat((depth0.unsqueeze(dim=0), depth1.unsqueeze(dim=0), depth2.unsqueeze(dim=0), depth3.unsqueeze(dim=0)), dim=0)
+    # x1 = x1.unsqueeze(dim=1)
+    x2 = torch.cat((depth3.unsqueeze(dim=0), depth2.unsqueeze(dim=0), depth1.unsqueeze(dim=0), depth0.unsqueeze(dim=0)), dim=0)
+    x2 = x2.unsqueeze(dim=1)
+    print(x1.shape)
+    print(x2.shape)
     y = compute_errors(x1, x2)
     print(y)
     pass
 
 
-if __name__ == '__main__':
-    # tf_perm()
-    errors_test()
+def showdepthnpy():
+    # depth0 = np.load("H:/KittiRaw_prepare/2011_09_26_drive_0001_sync_02/0000000000.npy")
+    depth0 = np.load("F:/test.npy")
 
+    depth1 = np.load("H:/KittiRaw_prepare/2011_09_26_drive_0001_sync_02/0000000001.npy")
+    depth2 = np.load("H:/KittiRaw_prepare/2011_09_26_drive_0001_sync_02/0000000002.npy")
+    depth3 = np.load("H:/KittiRaw_prepare/2011_09_26_drive_0001_sync_02/0000000003.npy")
+
+    import cv2
+    cv2.imshow("depth", depth0)
+    print(depth0.max())
+    print(depth0.min())
+    cv2.waitKey(0)
+    pass
+
+
+if __name__ == '__main__':
+    showdepthnpy()
+    # errors_test()
     pass

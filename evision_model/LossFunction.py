@@ -434,5 +434,6 @@ def resample(int_map=None, xy_float=None):
     y_float = torch.unsqueeze((2 * y_float / (H_in - 1)) - 1, dim=-1)  # new_y = 2*y/(h-1)-1
     grid = torch.cat((x_float, y_float), dim=-1).float()
     output = torch.nn.functional.grid_sample(int_map.float(), grid,
-                                             mode='bilinear', padding_mode='zeros', align_corners=None)
+                                             mode='bilinear', padding_mode='zeros', align_corners=False)
+    # align_corners=False是默认行为,True是PyTorch 1.3.0之前的默认行为,然而该函数的行为通过测试的版本是1.5,因此显示指定
     return output
