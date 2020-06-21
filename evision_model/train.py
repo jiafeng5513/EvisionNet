@@ -167,8 +167,14 @@ def main():
         tqdm.write(error_string)
         # TODO:输出验证集上的轨迹指标
 
-        for error, name in zip(errors, error_names):
-            tb_writer.add_scalar(name, error, epoch)
+        # abs_rel, sq_rel, rms, log_rms, a1, a2, a3
+        tb_writer.add_scalar("Relative Errors/abs_rel", errors[0], epoch)
+        tb_writer.add_scalar("Relative Errors/sq_rel", errors[1], epoch)
+        tb_writer.add_scalar("Root Mean Squared Error/rms", errors[2], epoch)
+        tb_writer.add_scalar("Root Mean Squared Error/log_rms", errors[3], epoch)
+        tb_writer.add_scalar("Thresholding accuracy/a1", errors[4], epoch)
+        tb_writer.add_scalar("Thresholding accuracy/a2", errors[5], epoch)
+        tb_writer.add_scalar("Thresholding accuracy/a3", errors[6], epoch)
 
         """======= step 8.3 : 保存验证效果最佳的模型状态 =========="""
         decisive_error = errors[1]  # 选取abs_real作为关键评价指标,注意论文上我们以a3为关键指标
@@ -268,13 +274,13 @@ def train(args, train_loader, depth_net, motion_net, optimizer, epoch_size, loss
         losses.update(total_loss.item(), args.batch_size)
 
         if log_losses:
-            tb_writer.add_scalar('Depth Consistency Loss', loss_calculator.getDepthConsistencyLoss(), n_iter)
-            tb_writer.add_scalar('Depth Smoothing Loss', loss_calculator.getDepthSmoothingLoss(), n_iter)
-            tb_writer.add_scalar('Motion Smoothing Loss', loss_calculator.getMotionSmoothingLoss(), n_iter)
-            tb_writer.add_scalar('Rgb Penalty', loss_calculator.getRgbPenalty(), n_iter)
-            tb_writer.add_scalar('SSIM Penalty', loss_calculator.getSsimPenalty(), n_iter)
-            tb_writer.add_scalar('Rot Loss', loss_calculator.getRotLoss(), n_iter)
-            tb_writer.add_scalar('Trans Loss', loss_calculator.getTransLoss(), n_iter)
+            tb_writer.add_scalar('Smoothing/Depth Smoothing Loss', loss_calculator.getDepthSmoothingLoss(), n_iter)
+            tb_writer.add_scalar('Smoothing/Motion Smoothing Loss', loss_calculator.getMotionSmoothingLoss(), n_iter)
+            tb_writer.add_scalar('Reprojection/Depth Consistency Loss', loss_calculator.getDepthConsistencyLoss(), n_iter)
+            tb_writer.add_scalar('Reprojection/Rgb Penalty', loss_calculator.getRgbPenalty(), n_iter)
+            tb_writer.add_scalar('Reprojection/SSIM Penalty', loss_calculator.getSsimPenalty(), n_iter)
+            tb_writer.add_scalar('Cyclic_Consistency/Rot Loss', loss_calculator.getRotLoss(), n_iter)
+            tb_writer.add_scalar('Cyclic_Consistency/Trans Loss', loss_calculator.getTransLoss(), n_iter)
             tb_writer.add_scalar('Total loss', total_loss, n_iter)
 
         """======3.5 梯度计算和更新======"""
@@ -304,7 +310,7 @@ def train(args, train_loader, depth_net, motion_net, optimizer, epoch_size, loss
 def validate_with_gt(args, val_loader, depth_net, motion_net, epoch, tb_writer, sample_nb_to_log=3):
     global device
     batch_time = AverageMeter()
-    error_names = ['abs_diff', 'abs_rel', 'sq_rel', 'a1', 'a2', 'a3']
+    error_names = ['abs_rel', 'sq_rel', 'rms', 'log_rms', 'a1', 'a2', 'a3']
     errors = AverageMeter(i=len(error_names))
     log_outputs = sample_nb_to_log > 0
     # 切换到验证模式
@@ -355,9 +361,9 @@ def compute_errors(gt, pred, crop=True):
         pred:  prediction   [B,1,128,416]
         crop:
     Returns:
-        abs_diff, abs_rel, sq_rel, a1, a2, a3
+        abs_rel, sq_rel, rms, log_rms, a1, a2, a3
     """
-    abs_diff, abs_rel, sq_rel, a1, a2, a3 = 0, 0, 0, 0, 0, 0
+    abs_rel, sq_rel, rms, log_rms, a1, a2, a3 = 0, 0, 0, 0, 0, 0, 0
     batch_size = gt.size(0)
 
     mask_1 = gt > 0
@@ -369,20 +375,23 @@ def compute_errors(gt, pred, crop=True):
         # 对当前gt做均值方差归一化
         valid_gt = ((current_gt - current_gt.min()) / (current_gt.max() - current_gt.min())).clamp(1e-3, 1)
         valid_pred = ((current_pred - current_pred.min()) / (current_pred.max() - current_pred.min())).clamp(1e-3, 1)
-
         valid_pred = valid_pred * torch.median(valid_gt) / torch.median(valid_pred)  # 不明白
-
+        # abs_diff += torch.mean(torch.abs(valid_gt - valid_pred))
+        # Relative Absolute Error，绝对相对误差
+        abs_rel += torch.mean(torch.abs(valid_gt - valid_pred) / valid_gt)
+        # Relative Squared Error，平方相对误差
+        sq_rel += torch.mean(((valid_gt - valid_pred) ** 2) / valid_gt)
+        # Root Mean Squared Error，均方根误差
+        rms += torch.sqrt(torch.mean((valid_gt - valid_pred) ** 2))
+        # Log Root Mean Squared Error，对数均方根误差
+        log_rms += torch.sqrt(torch.mean((torch.log(valid_gt)-torch.log(valid_pred))**2))
+        # 阈值精确度
         thresh = torch.max((valid_gt / valid_pred), (valid_pred / valid_gt))
         a1 += (thresh < 1.25).float().mean()
         a2 += (thresh < 1.25 ** 2).float().mean()
         a3 += (thresh < 1.25 ** 3).float().mean()
 
-        abs_diff += torch.mean(torch.abs(valid_gt - valid_pred))
-        abs_rel += torch.mean(torch.abs(valid_gt - valid_pred) / valid_gt)
-
-        sq_rel += torch.mean(((valid_gt - valid_pred) ** 2) / valid_gt)
-
-    return [metric.item() / batch_size for metric in [abs_diff, abs_rel, sq_rel, a1, a2, a3]]
+    return [metric.item() / batch_size for metric in [abs_rel, sq_rel, rms, log_rms, a1, a2, a3]]
 
 
 def save_path_formatter(args, parser):
