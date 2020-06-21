@@ -90,3 +90,5 @@ EvisonNet
 2. ego-motion指标:<br>
 ATE(Absolute Trajectory Error,绝对轨迹误差)在测试集上的均值和标准差,RE是旋转误差.(ATE (Absolute Trajectory Error) is computed as long as RE for rotation (Rotation Error). RE between R1 and R2 is defined as the angle of R1*R2^-1 when converted to axis/angle. It corresponds to RE = arccos( (trace(R1 @ R2^-1) - 1) / 2). While ATE is often said to be enough to trajectory estimation, RE seems important here as sequences are only seq_length frames long).<br>
 
+### 8.注意事项记录
+1. windows上的anaconda需要`Anaconda3`,`Anaconda3/Library/bin`,`Anaconda3/Scripts`,`Anaconda3/condabin`这四个环境变量.<br>

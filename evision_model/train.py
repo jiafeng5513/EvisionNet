@@ -62,6 +62,8 @@ parser.add_argument('--log-output', action='store_true', help='开启后,验证�
 parser.add_argument('--print-freq', default=10, type=int, metavar='N', help='print frequency')
 parser.add_argument('-f', '--training-output-freq', type=int, help='训练期间输出dispnet和重投影图片的频率,设为0则不输出',
                     metavar='N', default=0)
+
+
 """   全局变量   """
 best_error = -1  # 用于识别当前最佳的模型状态
 n_iter = 0  # 训练的次数
@@ -160,7 +162,7 @@ def main():
         tqdm.write('* Avg Loss : {:.3f}'.format(train_loss))
         """======= step 8.2 : 验证 ========"""
         # 验证时要输出 : 深度指标abs_diff, abs_rel, sq_rel, a1, a2, a3
-        errors, error_names = validate_with_gt(args, val_loader, depth_net, motion_net, epoch)
+        errors, error_names = validate_with_gt(args, val_loader, depth_net, motion_net, epoch, tb_writer)
         error_string = ', '.join('{} : {:.3f}'.format(name, error) for name, error in zip(error_names, errors))
         tqdm.write(error_string)
         # TODO:输出验证集上的轨迹指标
