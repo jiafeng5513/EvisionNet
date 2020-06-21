@@ -65,13 +65,13 @@ parser.add_argument('-f', '--training-output-freq', type=int, help='训练期间
 
 
 """   全局变量   """
-best_error = -1  # 用于识别当前最佳的模型状态
+best_a3 = 0  # 用于识别当前最佳的模型状态,a3取值[0,1],越大越好
 n_iter = 0  # 训练的次数
 device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")  # 计算设备
 
 
 def main():
-    global best_error, n_iter, device
+    global best_a3, n_iter, device
     args = parser.parse_args()
     torch.autograd.set_detect_anomaly(True)  # 启动梯度侦测,用于查找梯度终断
     """====== step 1 : 根据使用的数据类型加载相应的数据流水线  ======"""
@@ -177,13 +177,9 @@ def main():
         tb_writer.add_scalar("Thresholding accuracy/a3", errors[6], epoch)
 
         """======= step 8.3 : 保存验证效果最佳的模型状态 =========="""
-        decisive_error = errors[1]  # 选取abs_real作为关键评价指标,注意论文上我们以a3为关键指标
-        if best_error < 0:
-            best_error = decisive_error
-
-        # remember lowest error and save checkpoint
-        is_best = decisive_error < best_error
-        best_error = min(best_error, decisive_error)
+        decisive_a3 = errors[6]  # 选取a3为关键指标
+        is_best = decisive_a3 > best_a3  # 如果当前的a3比之前记录的a3更大,那么模型的最佳状态就是现在的状态
+        best_a3 = max(best_a3, decisive_a3)
         save_checkpoint(args.save_path, {'epoch': epoch + 1, 'state_dict': depth_net.module.state_dict()},
                         {'epoch': epoch + 1, 'state_dict': motion_net.module.state_dict()}, is_best)
     pass  # end of main
@@ -320,7 +316,7 @@ def validate_with_gt(args, val_loader, depth_net, motion_net, epoch, tb_writer, 
     end = time.time()
 
     validate_pbar = tqdm(total=len(val_loader), bar_format='{desc} {percentage:3.0f}%|{bar}| {postfix}')
-    validate_pbar.set_description('valid: Abs Error {:.4f} ({:.4f})'.format(0, 0))
+    validate_pbar.set_description('valid: a3 {:.4f} ({:.4f})'.format(0, 0))
     validate_pbar.set_postfix_str('<Time {} ({})>'.format(0, 0))
 
     for i, (tgt_img, depth) in enumerate(val_loader):
@@ -343,7 +339,7 @@ def validate_with_gt(args, val_loader, depth_net, motion_net, epoch, tb_writer, 
         batch_time.update(time.time() - end)
         end = time.time()
         validate_pbar.update(1)
-        validate_pbar.set_description('valid: Abs Error {:.4f} ({:.4f})'.format(errors.val[0], errors.avg[0]))
+        validate_pbar.set_description('valid: a3 {:.4f} ({:.4f})'.format(errors.val[6], errors.avg[6]))
         validate_pbar.set_postfix_str('<Time {}>'.format(batch_time))
 
     validate_pbar.close()
