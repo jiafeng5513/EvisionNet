@@ -16,11 +16,13 @@ import datetime
 from tqdm import tqdm
 import time
 import shutil
-
+from tensorboardX import SummaryWriter
 import models
 import custom_transforms
 from DataFlow.validation_folders import ValidationSet
 from LossFunction import LossFactory
+from evision_utils import tensor2array,AverageMeter
+
 
 """命令行参数"""
 parser = argparse.ArgumentParser(description='EvisionNet', formatter_class=argparse.ArgumentDefaultsHelpFormatter)
@@ -83,6 +85,7 @@ def main():
         args.save_path = 'checkpoints' / save_path
     print('=> will save everything to {}'.format(args.save_path))
     args.save_path.makedirs_p()
+    tb_writer = SummaryWriter(args.save_path)  # tensorboardx writer
     """====== step 3 : 指定随机数种子以便于实验复现 ======"""
     torch.manual_seed(args.seed)
 
@@ -152,7 +155,8 @@ def main():
     for epoch in range(args.epochs):
         tqdm.write("\n===========TRAIN EPOCH [{}/{}]===========".format(epoch + 1, args.epochs))
         """====== step 8.1 : 训练一个epoch ======"""
-        train_loss = train(args, train_loader, depth_net, motion_net, optimizer, args.epoch_size, total_loss_calculator)
+        train_loss = train(args, train_loader, depth_net, motion_net, optimizer,
+                           args.epoch_size, total_loss_calculator,tb_writer)
         tqdm.write('* Avg Loss : {:.3f}'.format(train_loss))
         """======= step 8.2 : 验证 ========"""
         # 验证时要输出 : 深度指标abs_diff, abs_rel, sq_rel, a1, a2, a3
@@ -160,6 +164,9 @@ def main():
         error_string = ', '.join('{} : {:.3f}'.format(name, error) for name, error in zip(error_names, errors))
         tqdm.write(error_string)
         # TODO:输出验证集上的轨迹指标
+
+        for error, name in zip(errors, error_names):
+            tb_writer.add_scalar(name, error, epoch)
 
         """======= step 8.3 : 保存验证效果最佳的模型状态 =========="""
         decisive_error = errors[1]  # 选取abs_real作为关键评价指标,注意论文上我们以a3为关键指标
@@ -175,7 +182,7 @@ def main():
 
 
 # 训练一个epoch
-def train(args, train_loader, depth_net, motion_net, optimizer, epoch_size, loss_calculator):
+def train(args, train_loader, depth_net, motion_net, optimizer, epoch_size, loss_calculator, tb_writer):
     global n_iter, device
     batch_time = AverageMeter()
     data_time = AverageMeter()
@@ -247,18 +254,26 @@ def train(args, train_loader, depth_net, motion_net, optimizer, epoch_size, loss
         """======3.4 计算损失======"""
         if args.intri_pred:
             # last None for obj_mask,we turn obj_mask off
-            total_loss = loss_calculator.getTotalLoss(imgs, depth_pred_list,
-                                                      trans_pred_list, trans_res_pred_list, rot_pred_list,
-                                                      inv_trans_pred_list, inv_trans_res_pred_list, inv_rot_pred_list,
-                                                      intrinsic_pred, None)
+            loss_calculator.SolveTotalLoss(imgs, depth_pred_list, trans_pred_list, trans_res_pred_list, rot_pred_list,
+                                           inv_trans_pred_list, inv_trans_res_pred_list, inv_rot_pred_list,
+                                           intrinsic_pred, None)
         else:
-            total_loss = loss_calculator.getTotalLoss(imgs, depth_pred_list,
-                                                      trans_pred_list, trans_res_pred_list, rot_pred_list,
-                                                      inv_trans_pred_list, inv_trans_res_pred_list, inv_rot_pred_list,
-                                                      gt_intrinsics, None)
-
+            loss_calculator.getTotalLoss(imgs, depth_pred_list, trans_pred_list, trans_res_pred_list, rot_pred_list,
+                                         inv_trans_pred_list, inv_trans_res_pred_list, inv_rot_pred_list,
+                                         gt_intrinsics, None)
+        total_loss = loss_calculator.getTotalLoss()
         # record loss and EPE
         losses.update(total_loss.item(), args.batch_size)
+
+        if log_losses:
+            tb_writer.add_scalar('Depth Consistency Loss', loss_calculator.getDepthConsistencyLoss(), n_iter)
+            tb_writer.add_scalar('Depth Smoothing Loss', loss_calculator.getDepthSmoothingLoss(), n_iter)
+            tb_writer.add_scalar('Motion Smoothing Loss', loss_calculator.getMotionSmoothingLoss(), n_iter)
+            tb_writer.add_scalar('Rgb Penalty', loss_calculator.getRgbPenalty(), n_iter)
+            tb_writer.add_scalar('SSIM Penalty', loss_calculator.getSsimPenalty(), n_iter)
+            tb_writer.add_scalar('Rot Loss', loss_calculator.getRotLoss(), n_iter)
+            tb_writer.add_scalar('Trans Loss', loss_calculator.getTransLoss(), n_iter)
+            tb_writer.add_scalar('Total loss', total_loss, n_iter)
 
         """======3.5 梯度计算和更新======"""
         optimizer.zero_grad()
@@ -283,15 +298,13 @@ def train(args, train_loader, depth_net, motion_net, optimizer, epoch_size, loss
 
 
 # 验证
-# abs_diff : 6.398, abs_rel : 0.416, sq_rel : 4.001, a1 : 0.333, a2 : 0.608, a3 : 0.799
-# 验证结构总是这个,暗示val_loader有问题
 @torch.no_grad()
-def validate_with_gt(args, val_loader, depth_net, motion_net, epoch):
+def validate_with_gt(args, val_loader, depth_net, motion_net, epoch, tb_writer, sample_nb_to_log=3):
     global device
     batch_time = AverageMeter()
     error_names = ['abs_diff', 'abs_rel', 'sq_rel', 'a1', 'a2', 'a3']
     errors = AverageMeter(i=len(error_names))
-
+    log_outputs = sample_nb_to_log > 0
     # 切换到验证模式
     depth_net.eval()
     motion_net.eval()
@@ -309,9 +322,13 @@ def validate_with_gt(args, val_loader, depth_net, motion_net, epoch):
         # compute output
         with torch.no_grad():
             output_depth = depth_net(tgt_img)
-            depth0 = output_depth[0,0,:,:]
-            import numpy as np
-            np.save("F:/test.npy", depth0.cpu().numpy())
+
+        if log_outputs and i < sample_nb_to_log:
+            if epoch == 0:
+                tb_writer.add_image('Val Input Image/{}'.format(i), tensor2array(tgt_img[0]), 0)
+                tb_writer.add_image('GT Depth Map/{}'.format(i), tensor2array(depth[0], max_value=None), epoch)
+            tb_writer.add_image('Pred Depth Map/{}'.format(i), tensor2array(output_depth[0], max_value=None), epoch)
+
         errors.update(compute_errors(depth, output_depth))
 
         # measure elapsed time
@@ -403,36 +420,6 @@ def save_checkpoint(save_path, depth_net_state, motion_net_state, is_best, filen
         for prefix in file_prefixes:
             shutil.copyfile(save_path / '{}_{}'.format(prefix, filename),
                             save_path / '{}_model_best.pth.tar'.format(prefix))
-
-
-class AverageMeter(object):
-    """Computes and stores the average and current value"""
-
-    def __init__(self, i=1, precision=3):
-        self.meters = i
-        self.precision = precision
-        self.reset(self.meters)
-
-    def reset(self, i):
-        self.val = [0] * i
-        self.avg = [0] * i
-        self.sum = [0] * i
-        self.count = 0
-
-    def update(self, val, n=1):
-        if not isinstance(val, list):
-            val = [val]
-        assert (len(val) == self.meters)
-        self.count += n
-        for i, v in enumerate(val):
-            self.val[i] = v
-            self.sum[i] += v * n
-            self.avg[i] = self.sum[i] / self.count
-
-    def __repr__(self):
-        val = ' '.join(['{:.{}f}'.format(v, self.precision) for v in self.val])
-        avg = ' '.join(['{:.{}f}'.format(a, self.precision) for a in self.avg])
-        return '{}({})'.format(val, avg)
 
 
 if __name__ == '__main__':

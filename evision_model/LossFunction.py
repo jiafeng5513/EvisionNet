@@ -92,10 +92,44 @@ class LossFactory(object):
         self.rotation_consistency_weight = rotation_consistency_weight
         self.translation_consistency_weight = translation_consistency_weight
         self.depth_consistency_loss_weight = depth_consistency_loss_weight
+
+        self.MotionSmoothingLoss = 0.0
+        self.DepthSmoothingLoss = 0.0
+        self.DepthConsistencyLoss = 0.0
+        self.RgbPenalty = 0.0
+        self.SsimPenalty = 0.0
+        self.RotLoss = 0.0
+        self.TransLoss = 0.0
+        self.TotalLoss = 0.0
         pass
 
+    # geters
+    def getMotionSmoothingLoss(self):
+        return self.MotionSmoothingLoss
+
+    def getDepthSmoothingLoss(self):
+        return self.DepthSmoothingLoss
+
+    def getDepthConsistencyLoss(self):
+        return self.DepthConsistencyLoss
+
+    def getRgbPenalty(self):
+        return self.RgbPenalty
+
+    def getSsimPenalty(self):
+        return self.SsimPenalty
+
+    def getRotLoss(self):
+        return self.RotLoss
+
+    def getTransLoss(self):
+        return self.TransLoss
+
+    def getTotalLoss(self):
+        return self.TotalLoss
+
     # public : 联合损失
-    def getTotalLoss(self, image_stack, depth_pred,
+    def SolveTotalLoss(self, image_stack, depth_pred,
                      trans, trans_res, rot, inv_trans, inv_trans_res, inv_rot,
                      intrinsic_mat, seg_stack=None):
         """
@@ -167,15 +201,17 @@ class LossFactory(object):
             _trans_loss += (_trans_loss_j + _trans_loss_i)
 
         # 加权
-        _total_loss = \
-            max(0.0, self.motion_smoothing_weight) * _motion_smoothing + \
-            max(0.0, self.depth_smoothing_weight) * _depth_smoothing_loss + \
-            max(0.0, self.depth_consistency_loss_weight) * _depth_consistency_loss + \
-            max(0.0, self.rgb_weight) * _rgb_loss + \
-            max(0.0, self.ssim_weight) * _ssim_loss + \
-            max(0.0, self.rotation_consistency_weight) * _rot_loss + \
-            max(0.0, self.translation_consistency_weight) * _trans_loss
-        return _total_loss
+        self.MotionSmoothingLoss = max(0.0, self.motion_smoothing_weight) * _motion_smoothing
+        self.DepthSmoothingLoss = max(0.0, self.depth_smoothing_weight) * _depth_smoothing_loss
+        self.DepthConsistencyLoss = max(0.0, self.depth_consistency_loss_weight) * _depth_consistency_loss
+        self.RgbPenalty = max(0.0, self.rgb_weight) * _rgb_loss
+        self.SsimPenalty = max(0.0, self.ssim_weight) * _ssim_loss
+        self.RotLoss = max(0.0, self.rotation_consistency_weight) * _rot_loss
+        self.TransLoss = max(0.0, self.translation_consistency_weight) * _trans_loss
+
+        self.TotalLoss =  self.MotionSmoothingLoss + self.DepthSmoothingLoss + self.DepthConsistencyLoss + \
+                      self.RgbPenalty + self.SsimPenalty + self.RotLoss + self.TransLoss
+        pass
 
     # private : 1.深度平滑损失
     def __Depth_Smoothing_Loss(self, depth, image):
@@ -207,7 +243,7 @@ class LossFactory(object):
     # private : 2.背景平移场平滑损失
     def __Motion_field_smoothness(self, motion_map):
         norm = torch.mean(motion_map.pow(2), dim=(1, 2, 3), keepdim=True) * 3.0
-        motion_map_p = motion_map/torch.sqrt(norm + 1e-12)
+        motion_map_p = motion_map / torch.sqrt(norm + 1e-12)
 
         """Calculates L1 (total variation) smoothness loss of a tensor.
 
@@ -257,7 +293,7 @@ class LossFactory(object):
         frame1_closer_to_camera = frame1transformed_depth.mask.mul(torch.le(frame1transformed_depth.depth,
                                                                             frame2depth_resampled)).float()
         depth_error = (
-                    torch.abs(frame2depth_resampled - frame1transformed_depth.depth) * frame1_closer_to_camera).mean()
+                torch.abs(frame2depth_resampled - frame1transformed_depth.depth) * frame1_closer_to_camera).mean()
         rgb_error = (torch.abs(frame2rgb_resampled - frame1rgb) * torch.unsqueeze(frame1_closer_to_camera, 1))
         rgb_error = rgb_error.mean()
 
@@ -272,8 +308,8 @@ class LossFactory(object):
                                                       frame1_closer_to_camera) + 1e-4
 
         depth_proximity_weight = (
-                depth_error_second_moment/((frame2depth_resampled - frame1transformed_depth.depth).pow(2) +
-                                          depth_error_second_moment) * frame1transformed_depth.mask.float())
+                depth_error_second_moment / ((frame2depth_resampled - frame1transformed_depth.depth).pow(2) +
+                                             depth_error_second_moment) * frame1transformed_depth.mask.float())
         ssim_error, avg_weight = self.__weighted_ssim(frame2rgb_resampled,
                                                       frame1rgb,
                                                       depth_proximity_weight,  # stop_gradient
@@ -312,7 +348,8 @@ class LossFactory(object):
         def _expand_dims_twice(x, dim):
             return torch.unsqueeze(torch.unsqueeze(x, dim), dim)
 
-        rotation1field, _ = torch.broadcast_tensors(_expand_dims_twice(rotation1, -2), translation1)  # translation1 [4,128,416,3]
+        rotation1field, _ = torch.broadcast_tensors(_expand_dims_twice(rotation1, -2),
+                                                    translation1)  # translation1 [4,128,416,3]
         rotation2field, _ = torch.broadcast_tensors(_expand_dims_twice(rotation2, -2), translation2)
         rotation1matrix = transform_utils.matrix_from_angles(rotation1field)
         rotation2matrix = transform_utils.matrix_from_angles(rotation2field)
