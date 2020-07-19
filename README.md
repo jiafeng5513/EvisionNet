@@ -12,8 +12,9 @@ EvisonNet
 ### 2. 环境说明<br>
 * Windows10 or Ubuntu 18.04
 * Python3.6 or 3.7,Anaconda3
-* CUDA10+cudnn7.5
-* tensorflow 1.13.1
+* CUDA10.2
+* tensorflow 1.14.0 (with cudnn7.6.5, for dfv)
+* PyTorch 1.5.0
 ### 3.对比实验
 * `depth_from_video_in_the_wild`: (unsupervised learning of depth, ego-motion, object motion, and camera intrinsics) [项目](https://github.com/google-research/google-research/tree/master/depth_from_video_in_the_wild) [论文](http://openaccess.thecvf.com/content_ICCV_2019/html/Gordon_Depth_From_Videos_in_the_Wild_Unsupervised_Monocular_Depth_Learning_ICCV_2019_paper.html)
 * `SfmLeaner_pytorch`:(Unsupervised Learning, explainability-mask) [项目](https://github.com/ClementPinard/SfmLearner-Pytorch) [论文](http://openaccess.thecvf.com/content_cvpr_2017/html/Zhou_Unsupervised_Learning_of_CVPR_2017_paper.html)
