@@ -95,4 +95,6 @@ EvisonNet
 ATE(Absolute Trajectory Error,绝对轨迹误差)在测试集上的均值和标准差,RE是旋转误差.(ATE (Absolute Trajectory Error) is computed as long as RE for rotation (Rotation Error). RE between R1 and R2 is defined as the angle of R1*R2^-1 when converted to axis/angle. It corresponds to RE = arccos( (trace(R1 @ R2^-1) - 1) / 2). While ATE is often said to be enough to trajectory estimation, RE seems important here as sequences are only seq_length frames long).<br>
 
 ### 8.注意事项记录
-1. windows上的anaconda需要`Anaconda3`,`Anaconda3/Library/bin`,`Anaconda3/Scripts`,`Anaconda3/condabin`这四个环境变量.<br>
+1. windows上的anaconda需要`Anaconda3`,`Anaconda3/Library/bin`,`Anaconda3/Scripts`,`Anaconda3/condabin`这四个环境变量. <br>
+2. DFV提到了一种"Randomized Layer Normalization",这种操作在PyTorch中很构造出文中描述的实现效果,我搞了一个似是而非的写法,在`evision_model/_Deprecated.py`中, 事实上这个方法如果真的想文中描述的那样有效,那么症结一定在别的地方. <br>
+3. `evision_model/_PlayGround.py`用于在开发过程中测试一些函数,其中的代码没有被其他文件依赖,可以所以修改甚至删除. <br>

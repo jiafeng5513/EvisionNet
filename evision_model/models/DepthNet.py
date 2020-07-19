@@ -10,9 +10,6 @@ code by jiafeng5513
 
 NOTE:
     1. TensorFlow 的默认顺序是 [N H W C], PyTorch的默认顺序是 [N C H W]
-
-    TF
-
     2. DepthNet输入一张张三通道图片，假设每张图片大小为[h,w],batch size =4，则输入张量为[4,3,h,w]
     3. 该文件的main函数仅供DepthNet进行shape检查
 """
