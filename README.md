@@ -16,44 +16,47 @@ EvisonNet
 * tensorflow 1.14.0 (with cudnn7.6.5, for dfv)
 * PyTorch 1.5.0
 ### 3.对比实验
-* `depth_from_video_in_the_wild`: (unsupervised learning of depth, ego-motion, object motion, and camera intrinsics) [项目](https://github.com/google-research/google-research/tree/master/depth_from_video_in_the_wild) [论文](http://openaccess.thecvf.com/content_ICCV_2019/html/Gordon_Depth_From_Videos_in_the_Wild_Unsupervised_Monocular_Depth_Learning_ICCV_2019_paper.html)
-* `SfmLeaner_pytorch`:(Unsupervised Learning, explainability-mask) [项目](https://github.com/ClementPinard/SfmLearner-Pytorch) [论文](http://openaccess.thecvf.com/content_cvpr_2017/html/Zhou_Unsupervised_Learning_of_CVPR_2017_paper.html)
-* `SfmLeaner_TF`:(Optimized for multiple GPUs) [项目](https://github.com/tinghuiz/SfMLearner) [论文](http://openaccess.thecvf.com/content_cvpr_2017/html/Zhou_Unsupervised_Learning_of_CVPR_2017_paper.html)
-* `struct2depth`: (unsupervised learning of scene depth and robot ego-motion) [项目](https://github.com/tensorflow/models/tree/master/research/struct2depth) [论文](https://wvvw.aaai.org/ojs/index.php/AAAI/article/view/4801)
+3.1. `depth_from_video_in_the_wild`
+* unsupervised learning of depth, ego-motion, object motion, and camera intrinsics) 
+* [论文](http://openaccess.thecvf.com/content_ICCV_2019/html/Gordon_Depth_From_Videos_in_the_Wild_Unsupervised_Monocular_Depth_Learning_ICCV_2019_paper.html) [项目](https://github.com/google-research/google-research/tree/master/depth_from_video_in_the_wild) 
+
+3.2. `SfmLeaner`
+* Unsupervised Learning, explainability-mask 
+* [论文](http://openaccess.thecvf.com/content_cvpr_2017/html/Zhou_Unsupervised_Learning_of_CVPR_2017_paper.html) [第三方PyTorch实现](https://github.com/ClementPinard/SfmLearner-Pytorch) [原文Tensorflow实现](https://github.com/tinghuiz/SfMLearner)
+
+3.3. `struct2depth`
+* unsupervised learning of scene depth and robot ego-motion
+* [论文](https://wvvw.aaai.org/ojs/index.php/AAAI/article/view/4801) [项目](https://github.com/tensorflow/models/tree/master/research/struct2depth) 
+
 ### 4. 参考文献<br>
-[1]. (双目视差)Chang, Jia-Ren, and Yong-Sheng Chen. "Pyramid stereo matching network." Proceedings of the IEEE Conference on Computer Vision and Pattern Recognition. 2018.[PSMNet](https://github.com/JiaRenChang/PSMNet).<br>
-[2]. (特征点匹配并应用于三维重建)Moo Yi K, Verdie Y, Fua P, et al. "Learning to assign orientations to feature points." Proceedings of the IEEE Conference on Computer Vision and Pattern Recognition. 2016: 107-116.[Code](https://github.com/vcg-uvic/benchmark-orientation).<br>
-[3]. Verdie, Yannick, et al. "TILDE: a temporally invariant learned detector." Proceedings of the IEEE Conference on Computer Vision and Pattern Recognition. 2015.[TILDE](https://github.com/cvlab-epfl/TILDE).<br>
-[4]. Han, Xufeng, et al. "Matchnet: Unifying feature and metric learning for patch-based matching." Proceedings of the IEEE Conference on Computer Vision and Pattern Recognition. 2015.[matchnet](https://github.com/hanxf/matchnet).<br>
-[5]. Zhou, Tinghui, et al. "Unsupervised learning of depth and ego-motion from video." Proceedings of the IEEE Conference on Computer Vision and Pattern Recognition. 2017.[SfMLearner](https://github.com/tinghuiz/SfMLearner).<br>
-[6]. Yi, Kwang Moo, et al. "Lift: Learned invariant feature transform." European Conference on Computer Vision. Springer, Cham, 2016.<br>
-[7]. Teng, Qianru, Yimin Chen, and Chen Huang. "Occlusion-Aware Unsupervised Learning of Monocular Depth, Optical Flow and Camera Pose with Geometric Constraints." Future Internet 10.10 (2018): 92.<br>
-[8]. Liu, Qiang, et al. "Using Unsupervised Deep Learning Technique for Monocular Visual Odometry." IEEE Access 7 (2019): 18076-18088.<br>
-[9]. DeepCalib: a deep learning approach for automatic intrinsic calibration of wide field-of-view cameras.[关键词:Camera Calibrate deep learning].<br>
-[10]. Depth from Videos in the Wild:Unsupervised Monocular Depth Learning from Unknown Cameras.<br>
-[11]. A Flexible New Technique for Camera Calibratio[张氏标定].<br>
-[12]. A Large Dataset to Train Convolutional Networks for Disparity, Optical Flow, and Scene Flow Estimation.[Evision1.0]<br>
-[13]. Deep Ordinal Regression Network for Monocular Depth Estimation.[Evision2.0]<br>
+[1]. Pyramid stereo matching network. [PSMNet](https://github.com/JiaRenChang/PSMNet). <br>
+[2]. TILDE: a temporally invariant learned detector.[TILDE](https://github.com/cvlab-epfl/TILDE). <br>
+[3]. Deep Ordinal Regression Network for Monocular Depth Estimation. <br>
+[4]. Occlusion-Aware Unsupervised Learning of Monocular Depth, Optical Flow and Camera Pose with Geometric Constraints." Future Internet 10.10 (2018): 92. <br>
+[5]. Liu, Qiang, et al. "Using Unsupervised Deep Learning Technique for Monocular Visual Odometry. <br>
+[6]. DeepCalib: a deep learning approach for automatic intrinsic calibration of wide field-of-view cameras.[关键词:Camera Calibrate deep learning]. <br>
+[7]. Depth from Videos in the Wild:Unsupervised Monocular Depth Learning from Unknown Cameras. <br>
+[8]. A Large Dataset to Train Convolutional Networks for Disparity, Optical Flow, and Scene Flow Estimation. <br>
 
 ### 5. 其他网址
-[1]. [middlebury 数据集](http://vision.middlebury.edu/stereo/).<br>
-[2]. [KITTI 数据集](http://www.cvlibs.net/datasets/kitti/).<br>
-[3]. [VIsion-SceneFlowDatasets数据集](https://lmb.informatik.uni-freiburg.de/resources/datasets/SceneFlowDatasets.en.html#faq).<br>
-[4]. [PSMNet解析](https://blog.csdn.net/zhiwei2coder/article/details/79929864?utm_source=blogxgwz3).<br>
-[5]. [中科院自动化所三维重建数据集](http://vision.ia.ac.cn/zh/data/index.html).<br>
-[6]. [SfMLearner(Depth and Ego-Motion)解析](https://zhuanlan.zhihu.com/p/50544334).<br>
-[7]. [OpenMVS](https://github.com/cdcseacave/openMVS).<br>
-[8]. [OpenMVG](https://github.com/openMVG/openMVG).<br>
-[9]. [CVonline,图片数据集汇总](http://homepages.inf.ed.ac.uk/rbf/CVonline/Imagedbase.htm).<br>
-[10]. [VisualData数据集搜索](https://www.visualdata.io/).<br>
-[11]. [360D-zenodo Dataset]().<br>
-[12]. [RGB-D Panorama Dataset](http://im2pano3d.cs.princeton.edu/).<br>
-[13]. [Deep Depth Completion of a Single RGB-D Image解析](https://cloud.tencent.com/developer/news/322095).<br>
-[14]. [Unsupervised Learning of Depth and Ego-Motion解析](https://zhuanlan.zhihu.com/p/50544334).<br>
-[15]. [视觉里程计 第二部分：匹配、鲁棒、优化和应用](https://blog.csdn.net/cicibabe/article/details/70260936).<br>
-[16]. [怎样通过照片获得高质量3D模型](https://zhuanlan.zhihu.com/p/24137374).<br>
-[17]. [tqdm.postfix](https://zhen8838.github.io/2019/01/25/tqdm-fmt/).<br>
-[18]. [KITTI_odometry_evaluation_tool](https://github.com/LearnerLee/KITTI_odometry_evaluation_tool)
+[1]. [middlebury 数据集](http://vision.middlebury.edu/stereo/). <br>
+[2]. [KITTI 数据集](http://www.cvlibs.net/datasets/kitti/). <br>
+[3]. [VIsion-SceneFlowDatasets数据集](https://lmb.informatik.uni-freiburg.de/resources/datasets/SceneFlowDatasets.en.html#faq). <br>
+[4]. [PSMNet解析](https://blog.csdn.net/zhiwei2coder/article/details/79929864?utm_source=blogxgwz3). <br>
+[5]. [中科院自动化所三维重建数据集](http://vision.ia.ac.cn/zh/data/index.html). <br>
+[6]. [SfMLearner(Depth and Ego-Motion)解析](https://zhuanlan.zhihu.com/p/50544334). <br>
+[7]. [OpenMVS](https://github.com/cdcseacave/openMVS). <br>
+[8]. [OpenMVG](https://github.com/openMVG/openMVG). <br>
+[9]. [CVonline,图片数据集汇总](http://homepages.inf.ed.ac.uk/rbf/CVonline/Imagedbase.htm). <br>
+[10]. [VisualData数据集搜索](https://www.visualdata.io/). <br>
+[11]. [360D-zenodo Dataset](). <br>
+[12]. [RGB-D Panorama Dataset](http://im2pano3d.cs.princeton.edu/). <br>
+[13]. [Deep Depth Completion of a Single RGB-D Image解析](https://cloud.tencent.com/developer/news/322095). <br>
+[14]. [Unsupervised Learning of Depth and Ego-Motion解析](https://zhuanlan.zhihu.com/p/50544334). <br>
+[15]. [视觉里程计 第二部分：匹配、鲁棒、优化和应用](https://blog.csdn.net/cicibabe/article/details/70260936). <br>
+[16]. [怎样通过照片获得高质量3D模型](https://zhuanlan.zhihu.com/p/24137374). <br>
+[17]. [tqdm.postfix](https://zhen8838.github.io/2019/01/25/tqdm-fmt/). <br>
+[18]. [KITTI_odometry_evaluation_tool](https://github.com/LearnerLee/KITTI_odometry_evaluation_tool). <br>
 ### 6.性能记录
 #### 表1:性能指标
 * seq 09和seq 10是ego-motion的指标(smaller the better).<br>
