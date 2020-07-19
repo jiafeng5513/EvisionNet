@@ -1,1 +1,0 @@
-epoch=30,init_lr=0.0002(decay by 0.5 in every5epochs),momentum=0.9,W_smooth=0.5,W_explain=0.05,batch size=4

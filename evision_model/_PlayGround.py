@@ -136,7 +136,47 @@ def showdepthnpy():
     pass
 
 
+
+import torch
+import torch.nn as nn
+
+class Net(nn.Module):
+    def __init__(self):
+        super(Net,self).__init__()
+
+        self.conv_1 = nn.Sequential(torch.nn.Conv2d(in_channels=1, out_channels=10, kernel_size=5),
+                                    nn.ReLU(inplace=True),
+                                    nn.MaxPool2d(2,2))
+        self.conv_2 = nn.Sequential(torch.nn.Conv2d(in_channels=10, out_channels=20, kernel_size=3),
+                                    nn.ReLU(inplace=True),
+                                    nn.MaxPool2d(2,2))
+        self.fc = nn.Sequential(nn.Linear(20*5*5, 200),
+                                 nn.Linear(200, 100),
+                                 nn.Linear(100, 10))
+
+    def num_flat_features(self, x):
+        size = x.size()[1:]
+        num_features = 1
+        for s in size:
+            num_features *= s
+        return num_features
+
+    def forward(self,x):
+        out1 = self.conv_1(x)
+        out2 = self.conv_2(out1)
+        out2 = out2.view(-1, self.num_flat_features(out2))
+        out3 = self.fc(out2)
+        return out3
+
 if __name__ == '__main__':
-    showdepthnpy()
-    # errors_test()
+    model = Net()
+    model = model.cuda()
+    model.eval()
+
+    image = torch.randn(1, 1, 28, 28)  # 输入尺寸 [N C H W]
+    image = image.cuda()
+    with torch.no_grad():
+        out = model(image)
+
+    print(out.shape)
     pass
